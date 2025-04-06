@@ -947,7 +947,7 @@ local function Initialise()
         GetRatioHealthyExplanation = QuickHeal_Shaman_GetRatioHealthyExplanation;
         QuickHealDownrank_Slider_NH:SetMinMaxValues(1,10);
         --QuickHealDownrank_Slider_NH:SetValue(10);
-        QuickHealDownrank_Slider_FH:SetMinMaxValues(1,6);
+        QuickHealDownrank_Slider_FH:SetMinMaxValues(1,7);
         --QuickHealDownrank_Slider_FH:SetValue(6);
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Shaman;
         SLASH_QUICKHEAL1 = "/qh";
@@ -972,8 +972,8 @@ local function Initialise()
         QuickHealDownrank_MarkerBot:Hide()
         QuickHeal_DownrankSlider:SetHeight(40)
         QuickHealDownrank_Slider_FH:SetPoint("TOPLEFT", 20, -10)
-        QuickHealDownrank_Slider_FH:SetMinMaxValues(1, 6);
-        QuickHealDownrank_Slider_FH:SetValue(6)
+        QuickHealDownrank_Slider_FH:SetMinMaxValues(1, 7);
+        QuickHealDownrank_Slider_FH:SetValue(7)
         QuickHealDownrank_RankNumberBot:SetPoint("CENTER", 108, 1)
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Paladin;
         SLASH_QUICKHEAL1 = "/qh";
@@ -987,7 +987,7 @@ local function Initialise()
         QuickHealDownrank_Slider_NH:SetMinMaxValues(1,11);
         QuickHealDownrank_Slider_NH:SetValue(3)
         QuickHealDownrank_Slider_FH:SetMinMaxValues(1, 9);
-        QuickHealDownrank_Slider_FH:SetValue(6)
+        QuickHealDownrank_Slider_FH:SetValue(7)
         QuickHealConfig_RatioHealthySlider:Hide();
         QuickHealConfig_Explanation:Hide();
 
