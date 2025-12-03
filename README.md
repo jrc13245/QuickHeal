@@ -1,153 +1,189 @@
-If you want to help, here is my paypal : [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/sebpoirot)
+# QuickHeal for Turtle WoW
 
-
-# QuickHeal Turtle WOW
-
-QuickHeal for Turtle WoW (updated for patch 1.18)
-
-QuickHeal gives healers fast access to all of their direct healing spells for healing party/raid members and themselves. It lets you heal the people who need it, without having to target them manually, or even having to deselect the enemy you're fighting. It gives maximum mana efficiency, and will automatically use a lower rank of healing if the target doesn't need your biggest heal, or if your mana is running low. <Br> 
-This also works when not in a party or a raid, and this will save you mana and precious time by automatically selecting the healing spell. <Br> 
-There are several different key bindings for constraining the scope of players that will be considered for heals.
-
+QuickHeal automates healing spell selection and targeting for healers. It heals the lowest health party/raid member without requiring manual targeting, automatically selects the optimal spell rank based on health deficit and mana, and works with Priest, Druid, Paladin, and Shaman.
 
 ## Installation
-- Download QuickHeal from this repository into your Interface folder and remove the "-turtle-wow-main" in the folder name
 
-## Usage
+Download QuickHeal into your `Interface/AddOns` folder. Ensure the folder is named `QuickHeal` (remove any `-main` suffix).
 
-**Basic usage**
+## Commands
 
-`/qh help` displays help inside the console<Br>
-`/qh cfg` invokes the configuration interface<Br>
-To invoke quickheal, make a macro with the `/qh` slash command
+| Command | Description |
+|---------|-------------|
+| `/qh` | Heal the lowest health target |
+| `/qh cfg` | Open configuration panel |
+| `/qh dr` | Open downrank slider window |
+| `/qh toggle` | Toggle between Normal and High HPS mode |
+| `/qh tanklist` | Toggle tank list display |
+| `/qh help` | Show help in chat |
 
-**Downrank**
+### Target Masks
 
-To conserve mana and heal more efficiently you can limit the maximum rank that QuickHeal will use. It is done by moving the slider. on the Downrank Window.<Br>
-`/qh dr`: Open the Downrank Window
+Constrain who can be healed by adding a mask:
 
-**High HPS vs Normal HPS**
+| Mask | Targets |
+|------|---------|
+| `player` | Yourself only |
+| `target` | Your current target |
+| `targettarget` | Your target's target |
+| `party` | Party members only |
+| `mt` | Main tanks only |
+| `nonmt` | Non-tanks only |
+| `subgroup` | Configured raid subgroups |
 
-`/qh toggle`: Toggles between Normal HPS and High HPS. This corresponds to the **Toggle Heathy Threshold 0/100**.  When invoked, it will echo `QuickHeal mode: Normal HPS` and `QuickHeal mode: High HPS` in the console to display its current state.
+Example: `/qh mt` heals only tanks, `/qh party` heals only party members.
 
-High HPS is restricted to fast-casting heal spells.
-    High healing throughput but low mana efficiency. e.g. Flash Heal
+### HPS Modes
 
-Normal HPS encomapsses ALL healing spells regardless of relative cast time.
-    Normal healing throughput with higher mana efficiency.
+**Normal HPS**: Uses all healing spells for maximum mana efficiency.
 
-**Tank list and mt healing**
+**High HPS**: Restricted to fast-casting spells (Flash Heal, Flash of Light, Lesser Healing Wave, Regrowth) for maximum throughput at the cost of mana efficiency.
 
-`/qh tanklist`: Toggles tanklist display.
+Toggle with `/qh toggle`.
 
-`+` adds current target into the list.  `C` clears the list.
+---
 
-**Other keybinds for specific healing**
+## Priest
 
-`/qh [mask] [type] [mod]` OR `/quickheal [mask] [type] [mod]`:<Br>
+**Spells used**: Lesser Heal, Heal, Greater Heal, Flash Heal, Renew
 
-`[mask]`: constrains healing pool to:<Br>
-`player`: yourself<Br>
-`target`: your target<Br>
-`targettarget`: your target's target<Br>
-`party`: your party<Br>
-`mt`: main tanks (defined in the configuration panel)<Br>
-`nonmt`: everyone but the main tanks<Br>
-`subgroup`: raid subgroups (defined in the configuration panel)<Br>
+### Recommended Macros
 
-`[type]`: constrains healing spell to:<Br>
-`heal`: Forces the use of your class' channeled heal spells.<Br>
-`hot`: Forces the use of your class' HoT spell over a channeled spell.  Only works for Priests & Druids <Br>
-`hs`: Forces the use of Holy Shock for paladins <Br>
-`chainheal`: Forces the use of the Chain Heal spell.  Only works for Shamans.<Br>
+```
+/qh
+```
+Basic heal - selects optimal direct heal spell and rank.
 
-`[mod]`: optional argument.  Modifies the application of HoTs:<Br>
-`max`: force the use of the best HPS Heal or Hot on the next target that is not @100% hp (and that does not currently have a HoT applied if it's a Hot) <Br>
-`fh`: firehose mode.  Will apply maximum rank HoT on the next target that does not have a HoT applied.<Br>
+```
+/qh hot
+```
+Cast Renew on the lowest health target without an active HoT.
 
-`/script QuickHeal(nil,'Spellname')`: this macro is similar to `/qh` without choosing the rank depending on heal need. For example, it can be useful for Regrowth if you want to max rank only, or Swiftmend also. <Br>
+```
+/qh hot max
+```
+Cast max rank Renew on the lowest health target.
 
-**QuickHeal Paladin Melee Healing**
+```
+/qh hot fh
+```
+Firehose mode - spam max rank Renew on targets without a HoT (useful for Naxx gargoyles).
 
-The following macros give paladins that choose to heal in melee additional tools to automate Holy Strike and Holy Shock.
+---
 
-`/qh hs`: Holy Shock macro dependant from quickheal rules (general threshold, priority, blacklist...) - Cancels autoattack <Br>
+## Druid
 
-`/run qhHShock(85)`: Other Holy Shock macro independant from quickheal rules (only use MAX rank on the lowest target around) - Number is the min % healing threshold to trigger (DEFAULT is set to 85%) - Doesn't cancel autoattack <Br>
+**Spells used**: Healing Touch, Regrowth, Rejuvenation
 
-`/run qhHStrike(93,3)`: Specific Holy Strike macro - 1st number is the min %healing threshold to trigger - the 2nd number is the # of targets needed under threshold (DEFAULT set at 93% threshold on 3 targets) <Br>
+### Recommended Macros
 
-## ChangeLog:
+```
+/qh
+```
+Basic heal - selects optimal Healing Touch or Regrowth rank.
 
-**Oct 10, 2025**<Br>
-- Paladin : replacing /qh hot by /qh hs for paladin only
-- Misc : /qh hot doesn't cancel auto attack anymore
+```
+/qh hot
+```
+Cast Rejuvenation on the lowest health target without an active HoT.
 
-**Oct 4, 2025**<Br>
-- Paladin : Allowing max rank usage of Holy Shock with "/qh hot max"
-- Paladin : Allowing max rank usage of Flash of Light or Holy Light (if active casting buff) with "/qh heal max"
+```
+/qh hot max
+```
+Cast max rank Rejuvenation.
 
-**Sep 21, 2025**<Br>
-- Misc : Nampower integration
+```
+/qh hot fh
+```
+Firehose mode - spam max rank Rejuvenation.
 
-**Sep 20, 2025**<Br>
-- Paladin : Adding melee paladins macros from other fork
+```
+/script QuickHeal(nil,'Swiftmend')
+```
+Cast Swiftmend (works while moving).
 
-**Sep 7, 2025**<Br>
-- Paladin : "/qh hot" works again (was always using the damage instead of healing since 1.18 TW patch)
-- Misc : Downrank fix for all classes
+```
+/script QuickHeal(nil,'Regrowth')
+```
+Force Regrowth at max rank regardless of heal need.
 
-**Aug 21, 2025**<Br>
-- Paladin : Removal of Daybreak which is no longer a heal multiplier in last Turtle Wow patch
-- Druid : Talent changes to fit 1.18
-- Shaman : Healing way now affects CH/HW and also LHW, after healing power
-- Misc : Healcom doesn't autocancel heals anymore (many complains about this mechanic)
-- Misc : Bonusscanner no longer necessary (itembonuslib does the job)
-- Misc : Mana cost fix on multiple spells
+---
 
-**Jan 31, 2025**<Br>
-- Paladin : Integration of Holy Shock logic with the "/qh hot" macro
-- Paladin : Holy Shock now use a rank system to limit overheal, updated from 1.17.2 values
-- Paladin : Divine Favor is taken in account for holy shock effectiveness
-- Paladin : Holy Shock is now usable while moving
-- Druid : Improved regrowth is taken in account for Regrowth effectiveness
-- Druid : /script QuickHeal(nil,'Swiftmend') now works while moving
+## Paladin
 
-**Jan 10, 2025**<Br>
-- Shaman : Removal of Purification talent bonus (no longer exist in last Turtle Wow Patch)
-- Shaman : Healing Way buff now affects Chain Heal too
-- Priest : Holy spells updated for 1.17.2 values
-- Priest : Spiritual Healing new value (30% instead of 10%)
-- Paladin : Integration of Holy Judgement mechanic to prio HL in that situation
-- Paladin : Integration of Daybreak buff detection and multiplier
-- Druid : Tree of Life doesn't cancel on quickheal usage anymore
-- Druid: Brought back "Cfg->General->Healthy Threshold Slider/RatioHealthy" slider and explanation text; You can now use regrowth even out of combat for Tree of life lovers
-- Druid : Brought back low ranks
+**Spells used**: Holy Light, Flash of Light, Holy Shock
 
-**Nov 11, 2024**<Br>
-- Paladin : Integration of R7 Flash of Light
+### Recommended Macros
 
+```
+/qh
+```
+Basic heal - selects Holy Light or Flash of Light based on heal need and talents.
 
+```
+/qh hs
+```
+Cast Holy Shock on the lowest health target. Cancels autoattack.
 
+```
+/qh hs max
+```
+Cast max rank Holy Shock.
 
+```
+/qh heal max
+```
+Cast max rank Flash of Light (or Holy Light if Holy Judgement buff active).
 
+### Melee Paladin Macros
 
+These macros are for paladins healing in melee range and do not cancel autoattack:
 
+```
+/run qhHShock(85)
+```
+Cast max rank Holy Shock if any target is below 85% HP.
 
+```
+/run qhHStrike(93,3)
+```
+Cast Holy Strike if 3+ targets are below 93% HP.
 
+---
 
+## Shaman
 
+**Spells used**: Healing Wave, Lesser Healing Wave, Chain Heal
 
+### Recommended Macros
 
+```
+/qh
+```
+Basic heal - selects optimal Healing Wave or Lesser Healing Wave rank.
 
+```
+/qh chainheal
+```
+Cast Chain Heal on the lowest health target.
 
+```
+/qh chainheal max
+```
+Cast max rank Chain Heal.
 
+---
 
+## Configuration
 
+Open the config panel with `/qh cfg`. Key settings:
 
+- **Healthy Threshold**: Skip healing targets above this HP percentage
+- **Force Self-Heal**: Prioritize self when below this HP percentage
+- **Target Priority**: Heal current target first if they need healing
+- **Subgroups**: Select which raid groups to heal
+- **Tank List**: Add tanks via `/qh tanklist` then click `+` with a tank targeted
 
+### Downranking
 
-
-
-
-
+Open the downrank window with `/qh dr`. The slider limits the maximum spell rank QuickHeal will use, allowing you to conserve mana by using lower ranks.
