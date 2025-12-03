@@ -15,6 +15,7 @@ function QuickHeal_Priest_FindHealSpellToUse(Target, healType, multiplier, force
     local SpellID = nil;
     local HealSize = 0;
     local Overheal = false;
+    local ForceGH = false;
 
     -- Return immediately if no player needs healing
     if not Target then
@@ -110,6 +111,12 @@ function QuickHeal_Priest_FindHealSpellToUse(Target, healType, multiplier, force
     InCombat = false;
     end
 
+    -- Detect Hazza'rah's Charm of Healing (Trinket from Zul'Gurub, Madness event)
+    if QuickHeal_DetectBuff('player',"Spell_Holy_HealingAura") then
+        QuickHeal_debug("BUFF: Hazza'rah buff (Greater Heal forced)");
+        ForceGH = true;
+    end
+
     -- Detect Inner Focus or Spirit of Redemption (hack ManaLeft and healneed)
     if QuickHeal_DetectBuff('player',"Spell_Frost_WindWalkOn",1) or QuickHeal_DetectBuff('player',"Spell_Holy_GreaterHeal") then
         QuickHeal_debug("Inner Focus or Spirit of Redemption active");
@@ -166,7 +173,17 @@ function QuickHeal_Priest_FindHealSpellToUse(Target, healType, multiplier, force
     if healType == "channel" then
         jgpprint("CHANNEL HEAL: " .. healType)
         -- Find suitable SpellID based on the defined criteria
-        if not InCombat or TargetIsHealthy or maxRankFH<1 then
+        if ForceGH and ManaLeft >= 351*ihMod and maxRankGH >=1 and downRankNH >= 8  and SpellIDsGH[1] then
+            -- Hazza'rah buff is active so use only GH if that's possible
+            QuickHeal_debug(string.format("Forcing GH with Hazza'rah buff"))
+            if Health < QuickHealVariables.RatioFull then
+                SpellID = SpellIDsGH[1]; HealSize = (838+healMod30)*shMod; 
+                if healneed > (1066+healMod30     )*K*shMod and ManaLeft >= 432*ihMod and maxRankGH >=2 and downRankNH >= 9  and SpellIDsGH[2] then SpellID = SpellIDsGH[2]; HealSize = (1066+healMod30)*shMod end
+                if healneed > (1328+healMod30     )*K*shMod and ManaLeft >= 517*ihMod and maxRankGH >=3 and downRankNH >= 10 and SpellIDsGH[3] then SpellID = SpellIDsGH[3]; HealSize = (1328+healMod30)*shMod end
+                if healneed > (1632+healMod30     )*K*shMod and ManaLeft >= 622*ihMod and maxRankGH >=4 and downRankNH >= 11 and SpellIDsGH[4] then SpellID = SpellIDsGH[4]; HealSize = (1632+healMod30)*shMod end
+                if healneed > (1768+healMod30     )*K*shMod and ManaLeft >= 674*ihMod and maxRankGH >=5 and downRankNH >= 12 and SpellIDsGH[5] then SpellID = SpellIDsGH[5]; HealSize = (1768+healMod30)*shMod end
+            end
+        elseif not InCombat or TargetIsHealthy or maxRankFH<1 then
             -- Not in combat or target is healthy so use the closest available mana efficient healing
             QuickHeal_debug(string.format("Not in combat or target healthy or no flash heal available, will use closest available LH, H or GH (not FH)"))
             if Health < QuickHealVariables.RatioFull then
@@ -212,6 +229,7 @@ function QuickHeal_Priest_FindHealSpellToUseNoTarget(maxhealth, healDeficit, hea
     local SpellID = nil;
     local HealSize = 0;
     local Overheal = false;
+    local ForceGH = false;
 
     if multiplier == nil then
         jgpprint(">>> multiplier is NIL <<<")
@@ -239,7 +257,7 @@ function QuickHeal_Priest_FindHealSpellToUseNoTarget(maxhealth, healDeficit, hea
     if (AceLibrary and AceLibrary:HasInstance("ItemBonusLib-1.0")) then
         local itemBonus = AceLibrary("ItemBonusLib-1.0")
         Bonus = itemBonus:GetBonus("HEAL") or 0
-        debug(string.format("Equipment Healing Bonus: %d", Bonus))
+        QuickHeal_debug(string.format("Equipment Healing Bonus: %d", Bonus))
     end
 
     -- Spiritual Guidance - Increases spell damage and healing by up to 5% (per rank) of your total Spirit.
@@ -278,6 +296,12 @@ function QuickHeal_Priest_FindHealSpellToUseNoTarget(maxhealth, healDeficit, hea
     if QuickHeal_DetectBuff('player',"Spell_Holy_SearingLight") then
         QuickHeal_debug("BUFF: Hand of Edward the Odd (out of combat healing forced)");
         InCombat = false;
+    end
+
+    -- Detect Hazza'rah's Charm of Healing (Trinket from Zul'Gurub, Madness event)
+    if QuickHeal_DetectBuff('player',"Spell_Holy_HealingAura") then
+        QuickHeal_debug("BUFF: Hazza'rah buff (Greater Heal forced)");
+        ForceGH = true;
     end
 
     -- Detect Inner Focus or Spirit of Redemption (hack ManaLeft and healneed)
@@ -319,7 +343,17 @@ function QuickHeal_Priest_FindHealSpellToUseNoTarget(maxhealth, healDeficit, hea
         K=0.8;
     end
 
-    if not forceMaxHPS then
+    if ForceGH and ManaLeft >= 351*ihMod and maxRankGH >=1 and downRankNH >= 8  and SpellIDsGH[1] then
+            -- Hazza'rah buff is active so use only GH if that's possible
+        QuickHeal_debug(string.format("Forcing GH with Hazza'rah buff"))
+        if Health < QuickHealVariables.RatioFull then
+            SpellID = SpellIDsGH[1]; HealSize = (838+healMod30)*shMod; 
+            if healneed > (1066+healMod30     )*K*shMod and ManaLeft >= 432*ihMod and maxRankGH >=2 and downRankNH >= 9  and SpellIDsGH[2] then SpellID = SpellIDsGH[2]; HealSize = (1066+healMod30)*shMod end
+            if healneed > (1328+healMod30     )*K*shMod and ManaLeft >= 517*ihMod and maxRankGH >=3 and downRankNH >= 10 and SpellIDsGH[3] then SpellID = SpellIDsGH[3]; HealSize = (1328+healMod30)*shMod end
+            if healneed > (1632+healMod30     )*K*shMod and ManaLeft >= 622*ihMod and maxRankGH >=4 and downRankNH >= 11 and SpellIDsGH[4] then SpellID = SpellIDsGH[4]; HealSize = (1632+healMod30)*shMod end
+            if healneed > (1768+healMod30     )*K*shMod and ManaLeft >= 674*ihMod and maxRankGH >=5 and downRankNH >= 12 and SpellIDsGH[5] then SpellID = SpellIDsGH[5]; HealSize = (1768+healMod30)*shMod end
+        end
+    elseif not forceMaxHPS then
         SpellID = SpellIDsLH[1]; HealSize = (53+healMod15*PF1)*shMod; -- Default to LH
         if healneed > (  84+healMod20*PF4 )*k*shMod and ManaLeft >=  45*ihMod and maxRankLH >=2 and downRankNH >= 2  and SpellIDsLH[2] then SpellID = SpellIDsLH[2]; HealSize = (  84+healMod20*PF4 )*shMod end
         if healneed > ( 154+healMod25*PF10)*K*shMod and ManaLeft >=  75*ihMod and maxRankLH >=3 and downRankNH >= 3  and SpellIDsLH[3] then SpellID = SpellIDsLH[3]; HealSize = ( 154+healMod25*PF10)*shMod end
@@ -332,17 +366,17 @@ function QuickHeal_Priest_FindHealSpellToUseNoTarget(maxhealth, healDeficit, hea
         if healneed > (1328+healMod30	  )*K*shMod and ManaLeft >= 545*ihMod and maxRankGH >=3 and downRankNH >= 10 and SpellIDsGH[3] then SpellID = SpellIDsGH[3]; HealSize = (1328+healMod30     )*shMod end
         if healneed > (1632+healMod30     )*K*shMod and ManaLeft >= 655*ihMod and maxRankGH >=4 and downRankNH >= 11 and SpellIDsGH[4] then SpellID = SpellIDsGH[4]; HealSize = (1632+healMod30     )*shMod end
         if healneed > (1768+healMod30     )*K*shMod and ManaLeft >= 710*ihMod and maxRankGH >=5 and downRankNH >= 12 and SpellIDsGH[5] then SpellID = SpellIDsGH[5]; HealSize = (1768+healMod30     )*shMod end
-    else
-        SpellID = SpellIDsFH[1]; HealSize = (225+healMod15)*shMod; -- Default to FH
-        if healneed > (297+healMod15)*k*shMod and ManaLeft >= 155 and maxRankFH >=2 and downRankFH >= 2 and SpellIDsFH[2] then SpellID = SpellIDsFH[2]; HealSize = (297+healMod15)*shMod end
-        if healneed > (319+healMod15)*k*shMod and ManaLeft >= 185 and maxRankFH >=3 and downRankFH >= 3 and SpellIDsFH[3] then SpellID = SpellIDsFH[3]; HealSize = (319+healMod15)*shMod end
-        if healneed > (387+healMod15)*k*shMod and ManaLeft >= 215 and maxRankFH >=4 and downRankFH >= 4 and SpellIDsFH[4] then SpellID = SpellIDsFH[4]; HealSize = (387+healMod15)*shMod end
-        if healneed > (498+healMod15)*k*shMod and ManaLeft >= 265 and maxRankFH >=5 and downRankFH >= 5 and SpellIDsFH[5] then SpellID = SpellIDsFH[5]; HealSize = (498+healMod15)*shMod end
-        if healneed > (618+healMod15)*k*shMod and ManaLeft >= 315 and maxRankFH >=6 and downRankFH >= 6 and SpellIDsFH[6] then SpellID = SpellIDsFH[6]; HealSize = (618+healMod15)*shMod end
-        if healneed > (769+healMod15)*k*shMod and ManaLeft >= 380 and maxRankFH >=7 and downRankFH >= 7 and SpellIDsFH[7] then SpellID = SpellIDsFH[7]; HealSize = (769+healMod15)*shMod end
+    elseif forceMaxHPS then
+        if ManaLeft >= 155 and maxRankFH >=2 and downRankFH >= 2 and SpellIDsFH[2] then SpellID = SpellIDsFH[2]; HealSize = (297+healMod15)*shMod end
+        if ManaLeft >= 185 and maxRankFH >=3 and downRankFH >= 3 and SpellIDsFH[3] then SpellID = SpellIDsFH[3]; HealSize = (319+healMod15)*shMod end
+        if ManaLeft >= 215 and maxRankFH >=4 and downRankFH >= 4 and SpellIDsFH[4] then SpellID = SpellIDsFH[4]; HealSize = (387+healMod15)*shMod end
+        if ManaLeft >= 265 and maxRankFH >=5 and downRankFH >= 5 and SpellIDsFH[5] then SpellID = SpellIDsFH[5]; HealSize = (498+healMod15)*shMod end
+        if ManaLeft >= 315 and maxRankFH >=6 and downRankFH >= 6 and SpellIDsFH[6] then SpellID = SpellIDsFH[6]; HealSize = (618+healMod15)*shMod end
+        if ManaLeft >= 380 and maxRankFH >=7 and downRankFH >= 7 and SpellIDsFH[7] then SpellID = SpellIDsFH[7]; HealSize = (769+healMod15)*shMod end
+
     end
 
-    return SpellID,HealSize*hdb;
+    return SpellID,HealSize*HDB;
 end
 
 function QuickHeal_Priest_FindHoTSpellToUse(Target, healType, forceMaxRank)
@@ -939,11 +973,6 @@ function QuickHeal_Command_Priest(msg)
 
     writeLine("/qh reset - Reset configuration to default parameters for all classes.");
 end
-
-
-
-
-
 
 
 

@@ -6,7 +6,7 @@ HealComm = AceLibrary("HealComm-1.0")
 --[ Mod data ]--
 QuickHealData = {
     name = 'QuickHeal',
-    version = '1.17.6',
+    version = 'TW 1.18.0',
     releaseDate = 'December 1st, 2022',
     author = 'T. Thorsen, S. Geeding and K. Karachalios feat. Dispatchio',
     website = 'https://turtle-wow.org/',
@@ -1519,38 +1519,55 @@ end
 -- Scan a particular buff/debuff index for buffs contained in tab and returns factor applied to healing
 -- returns false if no buff/debuff at index
 -- returns 1 if buff does not modify healing
+-- Scan a particular buff/debuff index for buffs contained in tab and returns factor applied to healing
+-- returns false if no buff/debuff at index
+-- returns 1 if buff does not modify healing
 local function ModifierScan(unit, idx, tab, debuff)
-    local UnitBuffDebuff = debuff and UnitDebuff or UnitBuff;
-    local icon, apps = UnitBuffDebuff(unit, idx);
-    if icon then
-        _, _, icon = string.find(icon, "Interface\\Icons\\(.+)")
-        local stype = tab[icon .. apps] or tab[icon];
-        if stype then
-            if type(stype) == "number" then
-                return (debuff and 1 - stype or 1 + stype);
-            elseif type(stype) == "boolean" then
-                QuickHeal_ScanningTooltip:ClearLines();
-                if debuff then
-                    QuickHeal_ScanningTooltip:SetUnitDebuff(unit, idx);
-                else
-                    QuickHeal_ScanningTooltip:SetUnitBuff(unit, idx)
-                end
-                local _, _, modifier = string.find(QuickHeal_ScanningTooltipTextLeft2:GetText(), " (%d+)%%")
-                modifier = tonumber(modifier);
-                if modifier and type(modifier) == "number" and ((modifier >= 0) and (modifier <= 100)) then
-                    -- Succesfully scanned and found numerical modifier
-                    return (debuff and 1 - modifier / 100 or 1 + modifier / 100);
-                else
-                    -- Failed in scanning, don't count (de)buff in
-                    return 1;
-                end
-            end
+    local UnitBuffDebuff = debuff and UnitDebuff or UnitBuff
+    local iconPath, apps = UnitBuffDebuff(unit, idx)
+    if not iconPath then return false end
+
+    -- Extract icon token (e.g. "Spell_Holy_Renew") from full texture path.
+    local _, _, token = string.find(iconPath, "Interface\\Icons\\(.+)")
+    if not token then
+        -- Unknown/odd texture format: treat as no (de)buff that affects healing.
+        -- 👇 tu peux activer cette ligne si tu veux voir lesquels posent problème
+        -- DEFAULT_CHAT_FRAME:AddMessage("QuickHeal: icône inconnue " .. tostring(iconPath))
+        return 1
+    end
+
+    -- Only try the "<icon><stacks>" key when stacks exist; otherwise skip the concat.
+    local stype
+    if apps and apps > 0 then
+        stype = tab[token .. apps]
+    end
+    if not stype then
+        stype = tab[token]
+    end
+
+    if not stype then
+        return 1 -- not a modifier we care about
+    end
+
+    if type(stype) == "number" then
+        return (debuff and 1 - stype or 1 + stype)
+    elseif type(stype) == "boolean" then
+        QuickHeal_ScanningTooltip:ClearLines()
+        if debuff then
+            QuickHeal_ScanningTooltip:SetUnitDebuff(unit, idx)
         else
-            -- Unknown icon, don't even try to scan
-            return 1;
+            QuickHeal_ScanningTooltip:SetUnitBuff(unit, idx)
+        end
+        local text = QuickHeal_ScanningTooltipTextLeft2:GetText()
+        local _, _, modifier = text and string.find(text, " (%d+)%%")
+        modifier = tonumber(modifier)
+        if modifier and modifier >= 0 and modifier <= 100 then
+            return (debuff and 1 - modifier / 100 or 1 + modifier / 100)
+        else
+            return 1
         end
     else
-        return false
+        return 1
     end
 end
 
@@ -1924,17 +1941,17 @@ local function CastCheckSpell()
     if class == "druid" then
         if HasRejuvRank1() then
             -- Cast Rejuvenation if Rank 1 exists in spellbook
-            CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_REJUVENATION)[1].SpellID, BOOKTYPE_SPELL);
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_REJUVENATION)[1].SpellID, BOOKTYPE_SPELL);
         else
             -- Fallback to Healing Touch
-            CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_TOUCH)[1].SpellID, BOOKTYPE_SPELL);
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_TOUCH)[1].SpellID, BOOKTYPE_SPELL);
         end
     elseif class == "paladin" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_LIGHT)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_LIGHT)[1].SpellID, BOOKTYPE_SPELL);
     elseif class == "priest" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_LESSER_HEAL)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_LESSER_HEAL)[1].SpellID, BOOKTYPE_SPELL);
     elseif class == "shaman" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_WAVE)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_WAVE)[1].SpellID, BOOKTYPE_SPELL);
     end
 end
 
@@ -1944,11 +1961,11 @@ local function CastCheckSpellHOT()
 
     --QuickHeal_debug("********** BREAKPOINT: CastCheckSpellHOT() **********");
     if class == "druid" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_REJUVENATION)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_REJUVENATION)[1].SpellID, BOOKTYPE_SPELL);
     elseif class == "paladin" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_SHOCK)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_SHOCK)[1].SpellID, BOOKTYPE_SPELL);
     elseif class == "priest" then
-        CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_RENEW)[1].SpellID, BOOKTYPE_SPELL);
+        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_RENEW)[1].SpellID, BOOKTYPE_SPELL);
     --elseif class == "shaman" then
     --    CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_WAVE)[1].SpellID, BOOKTYPE_SPELL);
     end
@@ -2754,15 +2771,15 @@ end
 function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
 
     -- Only one instance of QuickHeal allowed at a time
-    if QuickHealBusy then
-        if HealingTarget and MassiveOverhealInProgress then
-            QuickHeal_debug("Massive overheal aborted.");
-            SpellStopCasting();
-        else
-            QuickHeal_debug("Healing in progress, command ignored");
-        end
-        return ;
-    end
+    --if QuickHealBusy then
+        --if HealingTarget and MassiveOverhealInProgress then
+            --QuickHeal_debug("Massive overheal aborted.");
+            --SpellStopCasting();
+        --else
+            --QuickHeal_debug("Healing in progress, command ignored");
+       -- end
+       -- return ;
+   -- end
 
     QuickHealBusy = true;
     local AutoSelfCast = GetCVar("autoSelfCast");
@@ -2947,15 +2964,15 @@ end
 function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
 
     -- Only one instance of QuickHeal allowed at a time
-    if QuickHealBusy then
-        if HealingTarget and MassiveOverhealInProgress then
-            QuickHeal_debug("Massive overheal aborted.");
-            SpellStopCasting();
-        else
-            QuickHeal_debug("Healing in progress, command ignored");
-        end
-        return ;
-    end
+    --if QuickHealBusy then
+        --if HealingTarget and MassiveOverhealInProgress then
+            --QuickHeal_debug("Massive overheal aborted.");
+            --SpellStopCasting();
+       --else
+            --QuickHeal_debug("Healing in progress, command ignored");
+        --end
+        --return ;
+    --end
 
     QuickHealBusy = true;
     local AutoSelfCast = GetCVar("autoSelfCast");
@@ -3136,16 +3153,6 @@ end
 -- If parameters are missing they will be determined automatically
 
 function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
-    if QuickHealBusy then
-        if HealingTarget and MassiveOverhealInProgress then
-            QuickHeal_debug("Massive overheal aborted.");
-            SpellStopCasting();
-        else
-            QuickHeal_debug("Healing in progress, command ignored");
-        end
-        return;
-    end
-
     QuickHealBusy = true;
     local AutoSelfCast = GetCVar("autoSelfCast");
     SetCVar("autoSelfCast", 0);
@@ -3171,11 +3178,13 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
         end
     end
 
-    -- Sauvegarder si la cible actuelle est hostile, on utilisera TargetLastTarget pour revenir
+    -- ⚙️ Ne clear la target hostile que si le joueur est Paladin
     local hadHostileTarget = false;
-    if UnitExists('target') and not UnitIsFriend('player', 'target') then
-        hadHostileTarget = true;
-        ClearTarget();
+    if UnitClass("player") == "Paladin" then
+        if UnitExists('target') and not UnitIsFriend('player', 'target') then
+            hadHostileTarget = true;
+            ClearTarget();
+        end
     end
 
     if Target then
@@ -3256,7 +3265,6 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
 
     if SpellID then
         ExecuteHOT(Target, SpellID);
-
         if hadHostileTarget then TargetLastTarget(); end
     else
         Message("You have no healing spells to cast", "Error", 2);
@@ -3281,5 +3289,6 @@ end
 ------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------
+
 
 

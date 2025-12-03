@@ -453,626 +453,382 @@ function strmatch(str, pat, init)
 	return a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a13,a14,a15,a16,a17,a18,a19,a20
 end
 
+local function hc_paladin_mods()
+	local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
+	return 4*talentRank/100 + 1
+end
+
+local function hc_holy_light(SpellPower, SpellAmount, Scaling)
+	local hlMod = hc_paladin_mods()
+	return (SpellAmount*hlMod+(((2.5/3.5) * SpellPower)*Scaling))
+end
+
+local function hc_flash_of_light(SpellPower, SpellAmount)
+	local lp = 0
+	if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
+		local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
+		local name = GetItemInfo(itemstring)
+		if name == 	L["Libram of Divinity"] then
+			lp = 28
+		elseif name == L["Libram of Light"] then
+			lp = 41
+		end
+	end
+	local hlMod = hc_paladin_mods()
+	return (SpellAmount*hlMod+lp+((1.5/3.5) * SpellPower))
+end
+
+local function hc_shaman_mods()
+	-- Tidal Mastery
+	local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
+	return 0.5*talentRank/100 + 1
+end
+
+local function hc_healing_wave(SpellPower, SpellAmount, Scaling1, Scaling2)
+	local pMod = hc_shaman_mods()
+	return (SpellAmount*pMod+(((Scaling1) * SpellPower)*Scaling2))
+end
+
+local function hc_healing_wave2(SpellPower, SpellAmount)
+	local pMod = hc_shaman_mods()
+	return (SpellAmount+((3/3.5) * SpellPower)*pMod)
+end
+
+local function hc_lesser_healing_wave(SpellPower, SpellAmount)
+	local tp = 0
+	if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
+		local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
+		local name = GetItemInfo(itemstring)
+		if name == L["Totem of Sustaining"] then
+			tp = 28
+		elseif name == L["Totem of Life"] then
+			tp = 40
+		end
+	end
+	local pMod = hc_shaman_mods()
+	return (SpellAmount+tp+((1.5/3.5) * SpellPower)*pMod)
+end
+
+local function hc_chain_heal(SpellPower, SpellAmount)
+	local pMod = hc_shaman_mods()
+	return (SpellAmount+((2.5/3.5) * SpellPower)*pMod)
+end
+
+local function hc_priest_mods()
+	local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
+	local _,Spirit,_,_ = UnitStat("player",5)
+	local sgMod = Spirit * 5*talentRank/100
+	local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
+	local shMod = 6*talentRank2/100 + 1
+	return sgMod, shMod
+end
+
+local function hc_lesser_heal(SpellPower, SpellAmount, Scaling1, Scaling2)
+	local sgMod, shMod = hc_priest_mods()
+	return (SpellAmount+((Scaling1) * (SpellPower+sgMod))*Scaling2)*shMod
+end
+
+local function hc_heal(SpellPower, SpellAmount, Scaling)
+	local sgMod, shMod = hc_priest_mods()
+	return (SpellAmount+((3/3.5) * (SpellPower+sgMod))*Scaling)*shMod
+end
+
+local function hc_flash_heal(SpellPower, SpellAmount)
+	local sgMod, shMod = hc_priest_mods()
+	return (SpellAmount+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+end
+
+local function hc_greater_heal(SpellPower, SpellAmount)
+	local sgMod, shMod = hc_priest_mods()
+	return (SpellAmount+((3/3.5) * (SpellPower+sgMod)))*shMod
+end
+
+local function hc_prayer_of_healing(SpellPower, SpellAmount)
+	local sgMod, shMod = hc_priest_mods()
+	return (SpellAmount+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+end
+
+local function hc_druid_mods()
+	local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
+	return 2*talentRank/100 + 1
+end
+
+local function hc_healing_touch(SpellPower, SpellAmount, Scaling1, Scaling2)
+	local gnMod = hc_druid_mods()
+	return (SpellAmount+((Scaling1) * SpellPower * (Scaling2))*gnMod)
+end
+
+local function hc_healing_touch2(SpellPower, SpellAmount)
+	local gnMod = hc_druid_mods()
+	return ((SpellAmount+SpellPower)*gnMod)
+end
+
+local function hc_regrowth(SpellPower, SpellAmount, Scaling)
+	local gnMod = hc_druid_mods()
+	return ((SpellAmount+(((2/3.5)*SpellPower)*0.5*Scaling))*gnMod)
+end
+
+
 HealComm.Spells = {
 	[L["Holy Light"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (44*hlMod+(((2.5/3.5) * SpellPower)*0.1))
+			return hc_holy_light(SpellPower, 44, 0.1)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (88*hlMod+(((2.5/3.5) * SpellPower)*0.224))
+			return hc_holy_light(SpellPower, 88, 0.224)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (174*hlMod+(((2.5/3.5) * SpellPower)*0.476))
+			return hc_holy_light(SpellPower, 174, 0.476)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (334*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 334, 1)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (522*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 522, 1)
 		end;
 		[6] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (740*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 740, 1)
 		end;
 		[7] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (1000*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 1000, 1)
 		end;
 		[8] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (1318*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 1318, 1)
 		end;
 		[9] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (1681*hlMod+((2.5/3.5) * SpellPower))
+			return hc_holy_light(SpellPower, 1681, 1)
 		end;
 	};
 	[L["Flash of Light"]] = {
 		[1] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (68*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 68)
 		end;
 		[2] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (104*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 104)
 		end;
 		[3] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (155*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 155)
 		end;
 		[4] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (210*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 210)
 		end;
 		[5] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (284*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 284)
 		end;
 		[6] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (364*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 364)
 		end;
 		[7] = function (SpellPower)
-			local lp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == 	L["Libram of Divinity"] then
-					lp = 28
-				elseif name == L["Libram of Light"] then
-					lp = 41
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(1,6)
-			local hlMod = 4*talentRank/100 + 1
-			return (481*hlMod+lp+((1.5/3.5) * SpellPower))
+			return hc_flash_of_light(SpellPower, 481)
 		end;
 	};
 	[L["Healing Wave"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (40*pMod+(((1.5/3.5) * SpellPower)*0.22))
+			return hc_healing_wave(SpellPower, 40, 1.5/3.5, 0.22)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (72*pMod+(((2/3.5) * SpellPower)*0.38))
+			return hc_healing_wave(SpellPower, 72, 2/3.5, 0.38)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (143*pMod+(((2.5/3.5) * SpellPower)*0.446))
+			return hc_healing_wave(SpellPower, 143, 2.5/3.5, 0.446)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (293*pMod+(((3/3.5) * SpellPower)*0.7))
+			return hc_healing_wave(SpellPower, 293, 3/3.5, 0.7)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (409+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 409)
 		end;
 		[6] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (580+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 580)
 		end;
 		[7] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (798+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 798)
 		end;
 		[8] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (1093+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 1093)
 		end;
 		[9] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (1465+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 1465)
 		end;
 		[10] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (1736+((3/3.5) * SpellPower)*pMod)
+			return hc_healing_wave2(SpellPower, 1736)
 		end;
 	};
 	[L["Lesser Healing Wave"]] = {
 		[1] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (175+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 175)
 		end;
 		[2] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (265+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 265)
 		end;
 		[3] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (360+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 360)
 		end;
 		[4] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (487+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 487)
 		end;
 		[5] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (669+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 669)
 		end;
 		[6] = function (SpellPower)
-			local tp = 0
-			if GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")) then
-				local _,_,itemstring = string.find(GetInventoryItemLink("player",GetInventorySlotInfo("RangedSlot")), "|H(.+)|h")
-				local name = GetItemInfo(itemstring)
-				if name == L["Totem of Sustaining"] then
-					tp = 28
-				elseif name == L["Totem of Life"] then
-					tp = 40
-				end
-			end
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (881+tp+((1.5/3.5) * SpellPower)*pMod)
+			return hc_lesser_healing_wave(SpellPower, 881)
 		end;
 	};
 	[L["Chain Heal"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (344+((2.5/3.5) * SpellPower)*pMod)
+			return hc_chain_heal(SpellPower, 344)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (435+((2.5/3.5) * SpellPower)*pMod)
+			return hc_chain_heal(SpellPower, 435)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,5)
-			local pMod = 0.5*talentRank/100 + 1
-			return (591+((2.5/3.5) * SpellPower)*pMod)
+			return hc_chain_heal(SpellPower, 591)
 		end;
 	};
 	[L["Lesser Heal"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (53+((1.5/3.5) * (SpellPower+sgMod))*0.19)*shMod
+			return hc_lesser_heal(SpellPower, 53, 1.5/3.5, 0.19)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (84+((2/3.5) * (SpellPower+sgMod))*0.34)*shMod
+			return hc_lesser_heal(SpellPower, 84, 2/3.5, 0.34)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (154+((2.5/3.5) * (SpellPower+sgMod))*0.6)*shMod
+			return hc_lesser_heal(SpellPower, 154, 2.5/3.5, 0.6)
 		end;
 	};
 	[L["Heal"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (330+((3/3.5) * (SpellPower+sgMod))*0.586)*shMod
+			return hc_heal(SpellPower, 330, 0.586)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (476+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_heal(SpellPower, 476, 1)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (624+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_heal(SpellPower, 624, 1)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (667+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_heal(SpellPower, 667, 1)
 		end;
 	};
 	[L["Flash Heal"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (225+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 225)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (297+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 297)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (319+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 319)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (387+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 387)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (498+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 498)
 		end;
 		[6] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (618+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 618)
 		end;
 		[7] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (769+((1.5/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_flash_heal(SpellPower, 769)
 		end;
 	};
 	[L["Greater Heal"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (838+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_greater_heal(SpellPower, 838)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (1066+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_greater_heal(SpellPower, 1066)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (1328+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_greater_heal(SpellPower, 1328)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (1632+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_greater_heal(SpellPower, 1632)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (1768+((3/3.5) * (SpellPower+sgMod)))*shMod
+			return hc_greater_heal(SpellPower, 1768)
 		end;
 	};
 	[L["Prayer of Healing"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (323+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+			return hc_prayer_of_healing(SpellPower, 323)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (405+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+			return hc_prayer_of_healing(SpellPower, 405)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (593+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+			return hc_prayer_of_healing(SpellPower, 593)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (820+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+			return hc_prayer_of_healing(SpellPower, 820)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(2,12)
-			local _,Spirit,_,_ = UnitStat("player",5)
-			local sgMod = Spirit * 5*talentRank/100
-			local _,_,_,_,talentRank2,_ = GetTalentInfo(2,15)
-			local shMod = 6*talentRank2/100 + 1
-			return (910+((3/3.5/3) * (SpellPower+sgMod)))*shMod
+			return hc_prayer_of_healing(SpellPower, 910)
 		end;
 	};
 	[L["Healing Touch"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return (43+((1.5/3.5) * SpellPower * (1-((20-4)*0.0375)))*gnMod)
+			return hc_healing_touch(SpellPower, 43, 1.5/3.5, (1-((20-4)*0.0375)))
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return (101+((2/3.5) * SpellPower * (1-((20-13)*0.0375)))*gnMod)
+			return hc_healing_touch(SpellPower, 101, 2/3.5, (1-((20-13)*0.0375)))
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return (220+((2.5/3.5) * SpellPower)*gnMod)
+			return hc_healing_touch(SpellPower, 220, 2.5/3.5, 1)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return (435+((3/3.5) * SpellPower)*gnMod)
+			return hc_healing_touch(SpellPower, 435, 3/3.5, 1)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((634+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 634)
 		end;
 		[6] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((819+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 819)
 		end;
 		[7] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((1029+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 1029)
 		end;
 		[8] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((1314+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 1314)
 		end;
 		[9] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((1657+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 1657)
 		end;
 		[10] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((2061+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 2061)
 		end;
 		[11] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((2473+SpellPower)*gnMod)
+			return hc_healing_touch2(SpellPower, 2473)
 		end;
 	};
 	[L["Regrowth"]] = {
 		[1] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((91+(((2/3.5)*SpellPower)*0.5*0.38))*gnMod)
+			return hc_regrowth(SpellPower, 91, 0.38)
 		end;
 		[2] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((177+(((2/3.5)*SpellPower)*0.5*0.513))*gnMod)
+			return hc_regrowth(SpellPower, 177, 0.513)
 		end;
 		[3] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((258+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 258, 1)
 		end;
 		[4] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((340+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 340, 1)
 		end;
 		[5] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((432+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 432, 1)
 		end;
 		[6] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((544+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 544, 1)
 		end;
 		[7] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((686+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 686, 1)
 		end;
 		[8] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((858+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 858, 1)
 		end;
 		[9] = function (SpellPower)
-			local _,_,_,_,talentRank,_ = GetTalentInfo(3,9)
-			local gnMod = 2*talentRank/100 + 1
-			return ((1062+(((2/3.5)*SpellPower)*0.5))*gnMod)
+			return hc_regrowth(SpellPower, 1062, 1)
 		end;
 	};
 }
@@ -1200,7 +956,7 @@ function HealComm:GetUnitSpellPower(unit, spell)
 				targetpower = HLBonus + targetpower
 			end
 		end
-		if buffName == L["Healing Way"] and spell == L["Healing Wave"] then
+		if buffName == L["Healing Way"] and (spell == L["Healing Wave"] or spell == L["Chain Heal"]) then
 			targetmod = targetmod * ((buffApplications * 0.06) + 1)
 		end
 	end
