@@ -118,6 +118,164 @@ QUICKHEAL_LOADED = false;
 
 --[ Local Caches ]--
 local SpellCache = {};
+local TalentCache = {};
+local EquipmentBonusCache = nil;
+
+-- Clear all caches (call on relevant events)
+function QuickHeal_ClearSpellCache()
+    SpellCache = {};
+end
+
+function QuickHeal_ClearTalentCache()
+    TalentCache = {};
+end
+
+function QuickHeal_ClearEquipmentCache()
+    EquipmentBonusCache = nil;
+end
+
+-- Cached talent lookup: returns talentRank for given tab and index
+function QuickHeal_GetTalentRank(tab, index)
+    local key = tab .. "_" .. index;
+    if TalentCache[key] == nil then
+        local _,_,_,_,talentRank,_ = GetTalentInfo(tab, index);
+        TalentCache[key] = talentRank or 0;
+    end
+    return TalentCache[key];
+end
+
+-- Cached equipment healing bonus lookup
+function QuickHeal_GetEquipmentBonus()
+    if EquipmentBonusCache == nil then
+        if AceLibrary and AceLibrary:HasInstance("ItemBonusLib-1.0") then
+            local itemBonus = AceLibrary("ItemBonusLib-1.0");
+            EquipmentBonusCache = itemBonus:GetBonus("HEAL") or 0;
+        else
+            EquipmentBonusCache = 0;
+        end
+    end
+    return EquipmentBonusCache;
+end
+
+--[ Shared Spell Selection Helpers ]--
+
+-- +Healing Penalty Factors for spells learned before level 20
+-- PF = 1 - ((20 - LevelLearnt) * 0.0375)
+QuickHeal_PenaltyFactor = {
+    [1] = 0.2875,   -- Level 1
+    [4] = 0.4,      -- Level 4
+    [6] = 0.475,    -- Level 6
+    [8] = 0.55,     -- Level 8
+    [10] = 0.625,   -- Level 10
+    [12] = 0.7,     -- Level 12
+    [14] = 0.775,   -- Level 14
+    [18] = 0.925,   -- Level 18
+    [20] = 1.0,     -- Level 20+
+}
+
+-- Calculate healing modifier for a given cast time and bonus
+-- castTime in seconds (1.5, 2.0, 2.5, 3.0, 3.5)
+-- bonus is total +healing from gear and talents
+-- Returns the bonus healing for that cast time
+function QuickHeal_CalcHealMod(castTime, bonus)
+    return (castTime / 3.5) * bonus;
+end
+
+-- Get target health info (works with or without target)
+-- If target is nil, uses maxhealth/healDeficit parameters
+-- Returns: healneed, healthPercent, hdb (healing debuff modifier)
+function QuickHeal_GetTargetHealth(target, maxhealth, healDeficit, multiplier, hdb)
+    local healneed, healthPercent, healDebuffMod;
+    multiplier = multiplier or 1;
+
+    if target then
+        -- Get health from target unit
+        if QuickHeal_UnitHasHealthInfo(target) then
+            healneed = UnitHealthMax(target) - UnitHealth(target);
+            healthPercent = UnitHealth(target) / UnitHealthMax(target);
+        else
+            healneed = QuickHeal_EstimateUnitHealNeed(target, true);
+            healthPercent = UnitHealth(target) / 100;
+        end
+        healDebuffMod = QuickHeal_GetHealModifier(target);
+    else
+        -- Use passed parameters (NoTarget mode)
+        healneed = healDeficit or 0;
+        healthPercent = maxhealth and (1 - healDeficit / maxhealth) or 0;
+        healDebuffMod = hdb or 1;
+    end
+
+    -- Apply multiplier for overheal mode
+    if multiplier > 1 then
+        healneed = healneed * multiplier;
+    end
+
+    -- Adjust healneed for healing debuffs
+    healneed = healneed / healDebuffMod;
+
+    return healneed, healthPercent, healDebuffMod;
+end
+
+-- Get combat multipliers (k for fast spells, K for slow spells)
+-- Returns: k, K
+function QuickHeal_GetCombatMultipliers(inCombat)
+    if inCombat then
+        return 0.9, 0.8;  -- Compensate for health loss during cast
+    else
+        return 1.0, 1.0;
+    end
+end
+
+-- Data-driven spell rank selection
+-- spellRanks: table of {rank, baseHeal, manaCost, penaltyFactor, isFast}
+-- params: {healneed, manaLeft, healMod, talentMod, manaModifier, downRank, k, K, spellIDs}
+-- Returns: SpellID, HealSize
+function QuickHeal_SelectSpellRank(spellRanks, params)
+    local SpellID = nil;
+    local HealSize = 0;
+
+    local healneed = params.healneed or 0;
+    local manaLeft = params.manaLeft or 0;
+    local healMod = params.healMod or 0;
+    local talentMod = params.talentMod or 1;
+    local manaMod = params.manaMod or 1;
+    local downRank = params.downRank or 99;
+    local k = params.k or 1;  -- Fast spell combat multiplier
+    local K = params.K or 1;  -- Slow spell combat multiplier
+    local spellIDs = params.spellIDs;
+
+    if not spellIDs then return nil, 0; end
+
+    for i, spell in ipairs(spellRanks) do
+        local rank = spell.rank;
+        local baseHeal = spell.baseHeal;
+        local manaCost = spell.manaCost;
+        local pf = spell.pf or 1;  -- Penalty factor
+        local isFast = spell.isFast;
+        local castMod = spell.castMod or healMod;  -- Cast time specific heal mod
+
+        local combatMod = isFast and k or K;
+        local totalHeal = (baseHeal + castMod * pf) * talentMod;
+        local threshold = totalHeal * combatMod;
+        local mana = manaCost * manaMod;
+
+        -- First rank is default if we have mana for it
+        if i == 1 then
+            if manaLeft >= mana and spellIDs[rank] then
+                SpellID = spellIDs[rank];
+                HealSize = totalHeal;
+            end
+        else
+            -- Higher ranks check healneed threshold
+            if healneed > threshold and manaLeft >= mana and downRank >= rank and spellIDs[rank] then
+                SpellID = spellIDs[rank];
+                HealSize = totalHeal;
+            end
+        end
+    end
+
+    return SpellID, HealSize;
+end
 
 --[ Titan Panel functions ]--
 
@@ -1037,8 +1195,10 @@ local function Initialise()
         QuickClick_Load()
     end
 
-    -- Listen to LEARNED_SPELL_IN_TAB to clear cache when learning new spells
+    -- Listen to events for cache invalidation
     QuickHealConfig:RegisterEvent("LEARNED_SPELL_IN_TAB");
+    QuickHealConfig:RegisterEvent("CHARACTER_POINTS_CHANGED");
+    QuickHealConfig:RegisterEvent("UNIT_INVENTORY_CHANGED");
 
     --Register for Addon message event
     QuickHealConfig:RegisterEvent("CHAT_MSG_ADDON")
@@ -1242,8 +1402,14 @@ function QuickHeal_OnEvent()
         -- Spellcasting has stopped
         StopMonitor(event);
     elseif (event == "LEARNED_SPELL_IN_TAB") then
-        -- New spells learned, clear cache
-        SpellCache = {};
+        -- New spells learned, clear spell cache
+        QuickHeal_ClearSpellCache();
+    elseif (event == "CHARACTER_POINTS_CHANGED") then
+        -- Talents changed, clear talent cache
+        QuickHeal_ClearTalentCache();
+    elseif (event == "UNIT_INVENTORY_CHANGED") and arg1 == "player" then
+        -- Equipment changed, clear equipment bonus cache
+        QuickHeal_ClearEquipmentCache();
     elseif (event == "VARIABLES_LOADED") then
         Initialise();
     elseif (event == "CHAT_MSG_ADDON") then
@@ -1805,6 +1971,11 @@ function QuickHeal_GetSpellInfo(spellName)
 end
 
 function QuickHeal_GetSpellIDs(spellName)
+    -- Check cache first
+    if SpellCache[spellName] then
+        return SpellCache[spellName];
+    end
+
     local i = 1;
     local List = {};
     local spellNamei, spellRank;
@@ -1813,18 +1984,19 @@ function QuickHeal_GetSpellIDs(spellName)
         spellNamei, spellRank = GetSpellName(i, BOOKTYPE_SPELL);
 
         if not spellNamei then
+            -- Cache the result before returning
+            SpellCache[spellName] = List;
             return List
         end
-
-        --debug(string.format("spellNamei: %s ", Bonus));
 
         if spellNamei == spellName then
             _, _, spellRank = string.find(spellRank, " (%d+)$");
             spellRank = tonumber(spellRank);
             if not spellRank then
+                -- Single rank spell, cache and return spell ID
+                SpellCache[spellName] = i;
                 return i
             end
-            QuickHeal_debug("HEY >>> spellname: " .. spellNamei .. " spellRank: " .. spellRank);
             List[spellRank] = i;
         end
         i = i + 1;
