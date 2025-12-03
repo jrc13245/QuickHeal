@@ -1908,9 +1908,18 @@ end
 -- stat: SpellID, Mana, Heal, Time
 function QuickHeal_GetSpellInfo(spellName)
     --QuickHeal_debug("********** BREAKPOINT: QuickHeal_GetSpellInfo(spellName) BEGIN **********");
-    -- Check if info is already cached
+    -- Check if info is already cached in the correct format
     if SpellCache[spellName] then
-        return SpellCache[spellName];
+        local cached = SpellCache[spellName];
+        if type(cached) == "table" then
+            -- Check first entry to determine format
+            local firstEntry = cached[0] or cached[1];
+            if firstEntry and type(firstEntry) == "table" and firstEntry.SpellID then
+                -- Cache is in correct GetSpellInfo format
+                return cached;
+            end
+        end
+        -- Cache is in wrong format (from GetSpellIDs) or invalid, clear and rebuild
     end
 
     SpellCache[spellName] = {};
