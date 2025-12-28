@@ -419,6 +419,10 @@ function QuickHeal_Command_Druid(msg)
         QuickHeal_ToggleConfigurationPanel()
         return
     end
+    if cmd == "dll" then
+        QuickHeal_ReportDLLStatus()
+        return
+    end
     if cmd == "heal" then
         QuickHeal()
         return

@@ -82,8 +82,8 @@ local function GetHealingWayMod(target)
     return hwMod
 end
 
--- Chain Heal spell selection
-function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, forceMaxRank)
+-- Chain Heal spell selection (works with or without target)
+function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, forceMaxRank, maxhealth, healDeficit, hdb)
     local SpellID = nil
     local HealSize = 0
     multiplier = multiplier or 1
@@ -92,31 +92,33 @@ function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, 
     local RatioHealthy = QuickHeal_GetRatioHealthy()
     local debug = QuickHeal_debug
 
-    -- Return if no target
-    if not target then
-        return nil, 0
-    end
-
     -- Get health info
-    local healneed, Health, HDB
-    if QuickHeal_UnitHasHealthInfo(target) then
-        healneed = UnitHealthMax(target) - UnitHealth(target)
-        Health = UnitHealth(target) / UnitHealthMax(target)
+    local healneed, Health, HDB, hwMod
+    if target then
+        if QuickHeal_UnitHasHealthInfo(target) then
+            healneed = UnitHealthMax(target) - UnitHealth(target)
+            Health = UnitHealth(target) / UnitHealthMax(target)
+        else
+            healneed = QuickHeal_EstimateUnitHealNeed(target, true)
+            Health = UnitHealth(target) / 100
+        end
+        HDB = QuickHeal_GetHealModifier(target)
+        hwMod = GetHealingWayMod(target)
     else
-        healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-        Health = UnitHealth(target) / 100
+        -- NoTarget mode
+        if not maxhealth or maxhealth <= 0 then return nil, 0 end
+        healneed = healDeficit * multiplier
+        Health = healDeficit / maxhealth
+        HDB = hdb or 1
+        hwMod = 1  -- Can't detect Healing Way without target
     end
 
-    HDB = QuickHeal_GetHealModifier(target)
     debug("Target debuff healing modifier", HDB)
     healneed = healneed / HDB
 
     -- Get modifiers
     local mods = GetShamanModifiers()
     local ManaLeft = UnitMana('player')
-
-    -- Get Healing Way modifier
-    local hwMod = GetHealingWayMod(target)
 
     -- Get Chain Heal spell IDs
     local SpellIDsCH = QuickHeal_GetSpellIDs(QUICKHEAL_SPELL_CHAIN_HEAL)
@@ -139,6 +141,11 @@ function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, 
 
     debug(string.format("SpellID: %s  HealSize: %s", tostring(SpellID), tostring(HealSize)))
     return SpellID, HealSize * HDB
+end
+
+-- NoTarget wrapper for Chain Heal
+function QuickHeal_Shaman_FindChainHealSpellToUseNoTarget(maxhealth, healDeficit, healType, multiplier, forceMaxHPS, forceMaxRank, hdb, incombat)
+    return QuickHeal_Shaman_FindChainHealSpellToUse(nil, healType, multiplier, forceMaxRank, maxhealth, healDeficit, hdb)
 end
 
 -- Unified heal spell selection (works with or without target)
@@ -352,6 +359,10 @@ function QuickHeal_Command_Shaman(msg)
         writeLine(QuickHealData.name .. " reset to default configuration", 0, 0, 1)
         QuickHeal_ToggleConfigurationPanel()
         QuickHeal_ToggleConfigurationPanel()
+        return
+    end
+    if cmd == "dll" then
+        QuickHeal_ReportDLLStatus()
         return
     end
     if cmd == "chainheal" then

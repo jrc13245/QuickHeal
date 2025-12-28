@@ -59,14 +59,107 @@ local DQHV = { -- Default values
     FilterRaidGroup8 = false,
     DisplayHealingBar = true,
     QuickClickEnabled = true,
+    StopcastEnabled = true,
+    OverhealCancelThreshold = 50,
     MTList = { },
-    MeleeDPSList = { },
-    HealerList = { },
-    RangedDPSList = { },
     SkipList = { }
 }
 
 local has_pepo_nam = pcall(GetCVar, "NP_QueueCastTimeSpells")
+
+--[ DLL Detection ]--
+-- Nampower: Provides GetCastInfo, GetUnitField, IsSpellInRange, GetSpellRec, etc.
+local has_nampower = type(GetCastInfo) == "function"
+-- UnitXP_SP3: Provides UnitXP("distanceBetween"), UnitXP("inSight"), etc.
+local has_unitxp = type(UnitXP) == "function" and pcall(UnitXP, "nop", "nop")
+-- SuperWoW: Provides SpellInfo, UnitPosition, GUID-based targeting, etc.
+local has_superwow = type(SUPERWOW_VERSION) ~= "nil"
+
+-- Helper functions that use DLL features with fallbacks
+local function QH_GetDistance(unit1, unit2)
+    if has_unitxp then
+        local success, distance = pcall(UnitXP, "distanceBetween", unit1, unit2)
+        if success and distance then return distance end
+    end
+    return nil -- No distance available without DLL
+end
+
+local function QH_InLineOfSight(unit1, unit2)
+    if has_unitxp then
+        local success, inSight = pcall(UnitXP, "inSight", unit1, unit2)
+        if success then return inSight end
+    end
+    return true -- Assume LOS if no DLL (optimistic)
+end
+
+local function QH_IsSpellInRange(spellNameOrId, target)
+    if has_nampower and IsSpellInRange then
+        local success, result = pcall(IsSpellInRange, spellNameOrId, target)
+        if success then return result end
+    end
+    return 1 -- Assume in range if no DLL (optimistic)
+end
+
+local function QH_GetUnitHealth(unit)
+    if has_nampower and GetUnitField then
+        local success, health = pcall(GetUnitField, unit, "health")
+        if success and health then return health end
+    end
+    return UnitHealth(unit)
+end
+
+local function QH_GetUnitMaxHealth(unit)
+    if has_nampower and GetUnitField then
+        local success, maxHealth = pcall(GetUnitField, unit, "maxHealth")
+        if success and maxHealth then return maxHealth end
+    end
+    return UnitHealthMax(unit)
+end
+
+local function QH_GetUnitMana(unit)
+    if has_nampower and GetUnitField then
+        local success, mana = pcall(GetUnitField, unit, "power1")
+        if success and mana then return mana end
+    end
+    return UnitMana(unit)
+end
+
+local function QH_GetUnitMaxMana(unit)
+    if has_nampower and GetUnitField then
+        local success, maxMana = pcall(GetUnitField, unit, "maxPower1")
+        if success and maxMana then return maxMana end
+    end
+    return UnitManaMax(unit)
+end
+
+local function QH_GetSpellInfo(spellId)
+    -- Try SuperWoW's SpellInfo first
+    if has_superwow and SpellInfo then
+        local success, name, rank, texture, minRange, maxRange = pcall(SpellInfo, spellId)
+        if success then
+            return name, rank, texture, minRange, maxRange
+        end
+    end
+    -- Try Nampower's GetSpellRec
+    if has_nampower and GetSpellRec then
+        local success, spellRec = pcall(GetSpellRec, spellId)
+        if success and spellRec then
+            return spellRec.name, spellRec.rank, nil, nil, nil
+        end
+    end
+    return nil
+end
+
+-- Global function to report DLL status (can be called from /qh dll)
+function QuickHeal_ReportDLLStatus()
+    local function status(name, detected)
+        return name .. ": " .. (detected and "|cff00ff00Active|r" or "|cffff0000Not detected|r")
+    end
+    writeLine("QuickHeal DLL Status:")
+    writeLine("  " .. status("Nampower", has_nampower) .. " (GetCastInfo, IsSpellInRange, GetUnitField)")
+    writeLine("  " .. status("UnitXP_SP3", has_unitxp) .. " (Distance, Line of Sight)")
+    writeLine("  " .. status("SuperWoW", has_superwow) .. " (SpellInfo, GUID targeting)")
+end
 
 local me = UnitName('player')
 local TWA_Roster = { };
@@ -76,6 +169,8 @@ local QH_RequestedTWARoster = false;
 local MassiveOverhealInProgress = false;
 local QuickHealBusy = false;
 local HealingSpellSize = 0;
+local StopMonitor; -- Forward declaration
+local UpdateQuickHealOverhealStatus; -- Forward declaration
 local HealingTarget; -- Contains the unitID of the last player that was attempted healed
 local BlackList = {}; -- List of times were the players are no longer blacklisted
 local LastBlackListTime = 0;
@@ -483,432 +578,6 @@ end
 
 --[ MTList END ]--
 
--- MeleeDPSList
---[ MeleeDPSList BEGIN ]--
-
-function QH_ShowHideMeleeDPSListUI()
-    --{{{
-    if (MeleeDPSListFrame:IsVisible()) then
-        MeleeDPSListFrame:Hide();
-    else
-        MeleeDPSListFrame:Show();
-    end
-end --}}}
-
-function QH_ClearMeleeDPSList()
-    --{{{
-    QHV.MeleeDPSList = {};
-
-    MeleeDPSListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_AddTargetToMeleeDPSList()
-    --{{{
-    --Dcr_debug( "Adding the target to the priority list");
-    QH_AddUnitToMeleeDPSList("target");
-end --}}}
-
-function QH_AddUnitToMeleeDPSList(unit)
-    --{{{
-    if (UnitExists(unit)) then
-        if (UnitIsPlayer(unit)) then
-            local name = (UnitName(unit));
-            for _, pname in QHV.MeleeDPSList do
-                if (name == pname) then
-                    return ;
-                end
-            end
-            table.insert(QHV.MeleeDPSList, name);
-        end
-        MeleeDPSListFrame.UpdateYourself = true;
-    end
-end --}}}
-
-function QH_MeleeDPSListEntryTemplate_OnClick()
-    --{{{
-    local id = this:GetID();
-    if (id) then
-        if (this.Priority) then
-            QH_RemoveIDFromMeleeDPSList(id);
-        else
-            QH_RemoveIDFromSkipList(id);
-        end
-    end
-    this.UpdateYourself = true;
-
-end --}}}
-
-function QH_MeleeDPSListEntryTemplate_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        local baseName = this:GetName();
-        local NameText = getglobal(baseName .. "Name");
-
-        local id = this:GetID();
-        if (id) then
-            local name
-            if (this.Priority) then
-                name = QHV.MeleeDPSList[id];
-            else
-                name = QHV.SkipList[id];
-            end
-            if (name) then
-                NameText:SetText(id .. " - " .. name);
-                --else
-                --    NameText:SetText("Error - ID Invalid!");
-            end
-        else
-            NameText:SetText("Error - No ID!");
-        end
-    end
-end --}}}
-
-function QH_RemoveIDFromMeleeDPSList(id)
-    --{{{
-    table.remove(QHV.MeleeDPSList, id);
-    MeleeDPSListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_MeleeDPSListFrame_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        --Dcr_Groups_datas_are_invalid = true;
-        local baseName = this:GetName();
-        local up = getglobal(baseName .. "Up");
-        local down = getglobal(baseName .. "Down");
-
-        local size = table.getn(QHV.MeleeDPSList);
-
-        if (size < 11) then
-            this.Offset = 0;
-            up:Hide();
-            down:Hide();
-        else
-            if (this.Offset <= 0) then
-                this.Offset = 0;
-                up:Hide();
-                down:Show();
-            elseif (this.Offset >= (size - 10)) then
-                this.Offset = (size - 10);
-                up:Show();
-                down:Hide();
-            else
-                up:Show();
-                down:Show();
-            end
-        end
-
-        local i;
-        for i = 1, 10 do
-            local id = "" .. i;
-            if (i < 10) then
-                id = "0" .. i;
-            end
-            local btn = getglobal(baseName .. "Index" .. id);
-
-            btn:SetID(i + this.Offset);
-            btn.UpdateYourself = true;
-
-            if (i <= size) then
-                btn:Show();
-            else
-                btn:Hide();
-            end
-        end
-    end
-
-end --}}}
-
---[ MeleeDPSList END ]--
-
--- RangedDPSList
---[ RangedDPSList BEGIN ]--
-
-function QH_ShowHideRangedDPSListUI()
-    --{{{
-    if (RangedDPSListFrame:IsVisible()) then
-        RangedDPSListFrame:Hide();
-    else
-        RangedDPSListFrame:Show();
-    end
-end --}}}
-
-function QH_ClearRangedDPSList()
-    --{{{
-    QHV.RangedDPSList = {};
-
-    RangedDPSListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_AddTargetToRangedDPSList()
-    --{{{
-    --Dcr_debug( "Adding the target to the priority list");
-    QH_AddUnitToRangedDPSList("target");
-end --}}}
-
-function QH_AddUnitToRangedDPSList(unit)
-    --{{{
-    if (UnitExists(unit)) then
-        if (UnitIsPlayer(unit)) then
-            local name = (UnitName(unit));
-            for _, pname in QHV.RangedDPSList do
-                if (name == pname) then
-                    return ;
-                end
-            end
-            table.insert(QHV.RangedDPSList, name);
-        end
-        RangedDPSListFrame.UpdateYourself = true;
-    end
-end --}}}
-
-function QH_RangedDPSListEntryTemplate_OnClick()
-    --{{{
-    local id = this:GetID();
-    if (id) then
-        if (this.Priority) then
-            QH_RemoveIDFromRangedDPSList(id);
-        else
-            QH_RemoveIDFromSkipList(id);
-        end
-    end
-    this.UpdateYourself = true;
-
-end --}}}
-
-function QH_RangedDPSListEntryTemplate_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        local baseName = this:GetName();
-        local NameText = getglobal(baseName .. "Name");
-
-        local id = this:GetID();
-        if (id) then
-            local name
-            if (this.Priority) then
-                name = QHV.RangedDPSList[id];
-            else
-                name = QHV.SkipList[id];
-            end
-            if (name) then
-                NameText:SetText(id .. " - " .. name);
-                --else
-                --    NameText:SetText("Error - ID Invalid!");
-            end
-        else
-            NameText:SetText("Error - No ID!");
-        end
-    end
-end --}}}
-
-function QH_RemoveIDFromRangedDPSList(id)
-    --{{{
-    table.remove(QHV.RangedDPSList, id);
-    RangedDPSListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_RangedDPSListFrame_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        --Dcr_Groups_datas_are_invalid = true;
-        local baseName = this:GetName();
-        local up = getglobal(baseName .. "Up");
-        local down = getglobal(baseName .. "Down");
-
-        local size = table.getn(QHV.RangedDPSList);
-
-        if (size < 11) then
-            this.Offset = 0;
-            up:Hide();
-            down:Hide();
-        else
-            if (this.Offset <= 0) then
-                this.Offset = 0;
-                up:Hide();
-                down:Show();
-            elseif (this.Offset >= (size - 10)) then
-                this.Offset = (size - 10);
-                up:Show();
-                down:Hide();
-            else
-                up:Show();
-                down:Show();
-            end
-        end
-
-        local i;
-        for i = 1, 10 do
-            local id = "" .. i;
-            if (i < 10) then
-                id = "0" .. i;
-            end
-            local btn = getglobal(baseName .. "Index" .. id);
-
-            btn:SetID(i + this.Offset);
-            btn.UpdateYourself = true;
-
-            if (i <= size) then
-                btn:Show();
-            else
-                btn:Hide();
-            end
-        end
-    end
-
-end --}}}
-
---[ RangedDPSList END ]--
-
--- HealerList
---[ HealerList BEGIN ]--
-
-function QH_ShowHideHealerListUI()
-    --{{{
-    if (HealerListFrame:IsVisible()) then
-        HealerListFrame:Hide();
-    else
-        HealerListFrame:Show();
-    end
-end --}}}
-
-function QH_ClearHealerList()
-    --{{{
-    QHV.HealerList = {};
-
-    HealerListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_AddTargetToHealerList()
-    --{{{
-    --Dcr_debug( "Adding the target to the priority list");
-    QH_AddUnitToHealerList("target");
-end --}}}
-
-function QH_AddUnitToHealerList(unit)
-    --{{{
-    if (UnitExists(unit)) then
-        if (UnitIsPlayer(unit)) then
-            local name = (UnitName(unit));
-            for _, pname in QHV.HealerList do
-                if (name == pname) then
-                    return ;
-                end
-            end
-            table.insert(QHV.HealerList, name);
-        end
-        HealerListFrame.UpdateYourself = true;
-    end
-end --}}}
-
-function QH_HealerListEntryTemplate_OnClick()
-    --{{{
-    local id = this:GetID();
-    if (id) then
-        if (this.Priority) then
-            QH_RemoveIDFromHealerList(id);
-        else
-            QH_RemoveIDFromSkipList(id);
-        end
-    end
-    this.UpdateYourself = true;
-
-end --}}}
-
-function QH_HealerListEntryTemplate_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        local baseName = this:GetName();
-        local NameText = getglobal(baseName .. "Name");
-
-        local id = this:GetID();
-        if (id) then
-            local name
-            if (this.Priority) then
-                name = QHV.HealerList[id];
-            else
-                name = QHV.SkipList[id];
-            end
-            if (name) then
-                NameText:SetText(id .. " - " .. name);
-                --else
-                --    NameText:SetText("Error - ID Invalid!");
-            end
-        else
-            NameText:SetText("Error - No ID!");
-        end
-    end
-end --}}}
-
-function QH_RemoveIDFromHealerList(id)
-    --{{{
-    table.remove(QHV.HealerList, id);
-    HealerListFrame.UpdateYourself = true;
-end --}}}
-
-function QH_HealerListFrame_OnUpdate()
-    --{{{
-    if (this.UpdateYourself) then
-        this.UpdateYourself = false;
-        --Dcr_Groups_datas_are_invalid = true;
-        local baseName = this:GetName();
-        local up = getglobal(baseName .. "Up");
-        local down = getglobal(baseName .. "Down");
-
-        local size = table.getn(QHV.HealerList);
-
-        if (size < 11) then
-            this.Offset = 0;
-            up:Hide();
-            down:Hide();
-        else
-            if (this.Offset <= 0) then
-                this.Offset = 0;
-                up:Hide();
-                down:Show();
-            elseif (this.Offset >= (size - 10)) then
-                this.Offset = (size - 10);
-                up:Show();
-                down:Hide();
-            else
-                up:Show();
-                down:Show();
-            end
-        end
-
-        local i;
-        for i = 1, 10 do
-            local id = "" .. i;
-            if (i < 10) then
-                id = "0" .. i;
-            end
-            local btn = getglobal(baseName .. "Index" .. id);
-
-            btn:SetID(i + this.Offset);
-            btn.UpdateYourself = true;
-
-            if (i <= size) then
-                btn:Show();
-            else
-                btn:Hide();
-            end
-        end
-    end
-
-end --}}}
-
---[ HealerList END ]--
-
-function QH_RemoveIDFromSkipList(id)
-    --{{{
-    --table.remove( QHV.SkipList,id);
-    --DecursiveSkipListFrame.UpdateYourself = true;
-end --}}}
-
 function QH_DisplayTooltip(Message, RelativeTo)
     --{{{
     QH_Display_Tooltip:SetOwner(RelativeTo, "ANCHOR_TOPRIGHT");
@@ -1190,6 +859,15 @@ local function Initialise()
 
     writeLine(QuickHealData.name .. " " .. QuickHealData.version .. " for " .. UnitClass('player') .. " Loaded. Usage: '/qh help'.")
 
+    -- Report DLL status
+    local dllStatus = {}
+    if has_nampower then table.insert(dllStatus, "Nampower") end
+    if has_unitxp then table.insert(dllStatus, "UnitXP") end
+    if has_superwow then table.insert(dllStatus, "SuperWoW") end
+    if table.getn(dllStatus) > 0 then
+        QuickHeal_debug("DLL enhancements active: " .. table.concat(dllStatus, ", "))
+    end
+
     -- Initialise QuickClick
     if QHV.QuickClickEnabled and (type(QuickClick_Load) == "function") then
         QuickClick_Load()
@@ -1252,8 +930,56 @@ local function UpdateHealingBar(hpcurrent, hpafter, name)
     QuickHealHealingBarStatusBarPost:SetStatusBarColor(red, green, 0)
 end
 
+-- OnUpdate handler for healing bar - polls health during casting
+local HealingBarUpdateInterval = 0.1 -- Check every 100ms
+local HealingBarTimeSinceLastUpdate = 0
+function QuickHeal_HealingBar_OnUpdate(elapsed)
+    HealingBarTimeSinceLastUpdate = HealingBarTimeSinceLastUpdate + elapsed
+    if HealingBarTimeSinceLastUpdate < HealingBarUpdateInterval then
+        return
+    end
+    HealingBarTimeSinceLastUpdate = 0
+
+    -- Only update if we have a healing target
+    if not HealingTarget then
+        return
+    end
+
+    -- Check stopcast conditions
+    if QHV.StopcastEnabled then
+        -- Stop if target is dead
+        if UnitIsDeadOrGhost(HealingTarget) then
+            SpellStopCasting()
+            StopMonitor("Target died")
+            return
+        end
+        -- Stop if target moved out of range/LOS
+        if not QH_InLineOfSight('player', HealingTarget) then
+            SpellStopCasting()
+            StopMonitor("Target out of line of sight")
+            return
+        end
+        -- Stop if target health is above the full threshold
+        local healthPct
+        if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+            local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
+            healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+        else
+            healthPct = QH_GetUnitHealth(HealingTarget) / 100
+        end
+        if healthPct >= QHV.RatioFull then
+            SpellStopCasting()
+            StopMonitor("Heal no longer needed")
+            return
+        end
+    end
+
+    -- Update overheal status (this also handles overheal cancellation)
+    UpdateQuickHealOverhealStatus()
+end
+
 -- Update the Overheal status labels
-local function UpdateQuickHealOverhealStatus(multiplier)
+UpdateQuickHealOverhealStatus = function(multiplier)
     local textframe = getglobal("QuickHealOverhealStatus_Text");
     local healthpercentagepost, healthpercentage, healneed, overheal, waste;
 
@@ -1279,8 +1005,19 @@ local function UpdateQuickHealOverhealStatus(multiplier)
     -- Determine overheal
     overheal = HealingSpellSize - healneed;
 
-    -- Calculate waste
-    waste = overheal / HealingSpellSize * 100;
+    -- Calculate waste (guard against division by zero)
+    if HealingSpellSize > 0 then
+        waste = overheal / HealingSpellSize * 100;
+    else
+        waste = 0;
+    end
+
+    -- Cancel heal if overheal exceeds threshold
+    if QHV.StopcastEnabled and QHV.OverhealCancelThreshold and QHV.OverhealCancelThreshold > 0 and waste >= QHV.OverhealCancelThreshold then
+        SpellStopCasting()
+        StopMonitor("Overheal threshold exceeded (" .. floor(waste) .. "%)")
+        return
+    end
 
     UpdateHealingBar(healthpercentage, healthpercentagepost, UnitFullName(HealingTarget))
 
@@ -1340,12 +1077,16 @@ local function StartMonitor(Target, multiplier)
     if QHV.OverhealMessageScreenCenter then
         QuickHealOverhealStatusScreenCenter:Show()
     end
+    -- Always show for OnUpdate to work; use alpha for visibility control
     if QHV.DisplayHealingBar then
-        QuickHealHealingBar:Show()
+        QuickHealHealingBar:SetAlpha(1)
+    else
+        QuickHealHealingBar:SetAlpha(0)
     end
+    QuickHealHealingBar:Show()
 end
 
-local function StopMonitor(trigger)
+StopMonitor = function(trigger)
     QuickHealOverhealStatus:Hide();
     QuickHealOverhealStatusScreenCenter:Hide();
     QuickHealHealingBar:Hide()
@@ -1397,6 +1138,34 @@ function QuickHeal_OnEvent()
         -- Triggered when someone in the party/raid, current target or mouseover is healed/damaged
         if UnitIsUnit(HealingTarget, arg1) then
             UpdateQuickHealOverhealStatus()
+            -- Check if we should stop casting because heal is no longer needed
+            if QHV.StopcastEnabled then
+                -- Stop if target is dead
+                if UnitIsDeadOrGhost(HealingTarget) then
+                    SpellStopCasting()
+                    StopMonitor("Target died")
+                    return
+                end
+                -- Stop if target moved out of range/LOS (using UnitXP if available)
+                if not QH_InLineOfSight('player', HealingTarget) then
+                    SpellStopCasting()
+                    StopMonitor("Target out of line of sight")
+                    return
+                end
+                -- Stop if target health (including incoming heals) is above the full threshold
+                local healthPct
+                if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+                    local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
+                    healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+                else
+                    healthPct = QH_GetUnitHealth(HealingTarget) / 100
+                end
+                if healthPct >= QHV.RatioFull then
+                    SpellStopCasting()
+                    StopMonitor("Heal no longer needed")
+                    return
+                end
+            end
         end
     elseif (event == "SPELLCAST_STOP") or (event == "SPELLCAST_FAILED") or (event == "SPELLCAST_INTERRUPTED") then
         -- Spellcasting has stopped
@@ -1898,9 +1667,33 @@ local function UnitIsHealable(unit, explain)
         if EvaluateUnitCondition(unit, UnitIsVisible(unit), "is not visible to client", explain) then
             return false
         end
+        -- Check line of sight using UnitXP if available
+        if EvaluateUnitCondition(unit, QH_InLineOfSight('player', unit), "is not in line of sight", explain) then
+            return false
+        end
     else
         return false
     end
+    return true
+end
+
+-- Check if unit is in healing range (uses DLL functions if available)
+-- maxRange: maximum heal range in yards (default 40)
+local function UnitIsInHealRange(unit, maxRange)
+    maxRange = maxRange or 40
+
+    -- First check if we have distance info from UnitXP
+    local distance = QH_GetDistance('player', unit)
+    if distance then
+        return distance <= maxRange
+    end
+
+    -- Fallback: use CheckInteractDistance (28 yards for index 4)
+    if CheckInteractDistance(unit, 4) then
+        return true
+    end
+
+    -- No reliable range check available, assume in range
     return true
 end
 

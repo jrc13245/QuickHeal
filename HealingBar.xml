@@ -144,6 +144,9 @@
                 GameTooltip:Hide();
                 this.tooltipShown = false;
             </OnLeave>
+            <OnUpdate>
+                QuickHeal_HealingBar_OnUpdate(arg1);
+            </OnUpdate>
 		</Scripts>
 	</Frame>
 
