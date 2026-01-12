@@ -152,6 +152,63 @@ local function QH_GetSpellInfo(spellId)
     return nil
 end
 
+-- Get unit GUID (SuperWoW makes UnitExists return the GUID)
+local function QH_GetUnitGUID(unit)
+    if has_superwow then
+        local exists, guid = UnitExists(unit)
+        if exists and guid then return guid end
+    end
+    return nil
+end
+
+-- Cast a healing spell using the best method available
+-- Returns true if cast was initiated, false otherwise
+local function QH_CastHealSpell(spellID, target)
+    local SpellName, SpellRank = GetSpellName(spellID, BOOKTYPE_SPELL)
+    if not SpellName then return false end
+
+    local SpellNameAndRank = SpellName .. (SpellRank and SpellRank ~= "" and " (" .. SpellRank .. ")" or "")
+
+    -- Method 1: SuperWoW GUID targeting (most reliable, no target switching needed)
+    if has_superwow then
+        local guid = QH_GetUnitGUID(target)
+        if guid then
+            if has_pepo_nam and CastSpellByNameNoQueue then
+                -- Use no-queue casting with GUID
+                local success = pcall(CastSpellByNameNoQueue, SpellNameAndRank, guid)
+                if success then return true end
+            else
+                -- Use regular CastSpellByName with GUID
+                local success = pcall(CastSpellByName, SpellNameAndRank, guid)
+                if success then return true end
+            end
+        end
+    end
+
+    -- Method 2: Nampower no-queue casting (prevents queue issues)
+    if has_pepo_nam and CastSpellByNameNoQueue then
+        CastSpell(spellID, BOOKTYPE_SPELL)
+        return true
+    end
+
+    -- Method 3: Standard casting
+    CastSpell(spellID, BOOKTYPE_SPELL)
+    return true
+end
+
+-- Check if a specific healing spell is in range of target
+local function QH_IsHealSpellInRange(spellID, target)
+    if has_nampower and IsSpellInRange then
+        local SpellName = GetSpellName(spellID, BOOKTYPE_SPELL)
+        if SpellName then
+            local result = QH_IsSpellInRange(SpellName, target)
+            -- IsSpellInRange returns: 1 = in range, 0 = out of range, -1 = not applicable
+            if result == 0 then return false end
+        end
+    end
+    return true -- Assume in range if we can't check
+end
+
 -- Global function to report DLL status (can be called from /qh dll)
 function QuickHeal_ReportDLLStatus()
     local function status(name, detected)
@@ -161,6 +218,12 @@ function QuickHeal_ReportDLLStatus()
     writeLine("  " .. status("Nampower", has_nampower) .. " (GetCastInfo, IsSpellInRange, GetUnitField)")
     writeLine("  " .. status("UnitXP_SP3", has_unitxp) .. " (Distance, Line of Sight)")
     writeLine("  " .. status("SuperWoW", has_superwow) .. " (SpellInfo, GUID targeting)")
+    if has_superwow then
+        writeLine("    GUID targeting: |cff00ff00Enabled|r")
+    end
+    if has_pepo_nam then
+        writeLine("    No-queue casting: |cff00ff00Enabled|r")
+    end
 end
 
 local me = UnitName('player')
@@ -766,6 +829,15 @@ local function Initialise()
     -- Update configuration panel with version information
     QuickHealConfig_TextVersion:SetText("Version: " .. QuickHealData.version);
 
+    -- Setup QuickHealVariables with defaults BEFORE class-specific slider setup
+    if not QuickHealVariables then QuickHealVariables = {}; end
+    QHV = QuickHealVariables;
+    for k in pairs(DQHV) do
+        if QHV[k] == nil then
+            QHV[k] = DQHV[k]
+        end;
+    end
+
     --local _, PlayerClass = UnitClass('player');
     --PlayerClass = string.lower(PlayerClass);
 
@@ -830,7 +902,7 @@ local function Initialise()
         QuickHealMinrank_Slider_NH:Show();
         QuickHealMinrank_RankNumberTop:Show();
 
-        QuickHeal_DownrankSlider:SetHeight(220);
+        QuickHeal_DownrankSlider:SetHeight(310);
 
         -- Configure for Paladin
         QuickHealDownrank_Slider_NH:SetMinMaxValues(1, 9); -- Holy Light ranks
@@ -848,7 +920,7 @@ local function Initialise()
         QuickHealMinrank_Label_NH:SetText("Holy Light");
         QuickHealMinrank_Label_FH:SetText("Flash of Light");
 
-        QuickHealDownrank_RankNumberBot:SetPoint("CENTER", 108, -108); -- Reset position if it was moved
+        QuickHealDownrank_RankNumberBot:SetPoint("CENTER", QuickHeal_DownrankSlider, "TOP", 108, -108); -- Reset position if it was moved
         QuickHealMinrank_Slider_FH:SetValue(QuickHealVariables.MinrankValueFH);
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Paladin;
         SLASH_QUICKHEAL1 = "/qh";
@@ -894,17 +966,6 @@ local function Initialise()
     -- Hook the UIErrorsFrame_OnEvent method
     OriginalUIErrorsFrame_OnEvent = UIErrorsFrame_OnEvent;
     UIErrorsFrame_OnEvent = NewUIErrorsFrame_OnEvent;
-
-    -- Setup QuickHealVariables (and initialise upon first use)
-
-    if not QuickHealVariables then QuickHealVariables = {}; end
-    QHV = QuickHealVariables;
-
-    for k in pairs(DQHV) do
-        if QHV[k] == nil then
-            QHV[k] = DQHV[k]
-        end;
-    end
 
     -- Save the version of the mod along with the configuration
     QuickHealVariables["ConfigID"] = QuickHealData.version;
@@ -1044,6 +1105,12 @@ UpdateQuickHealOverhealStatus = function(multiplier)
     local textframe = getglobal("QuickHealOverhealStatus_Text");
     local healthpercentagepost, healthpercentage, healneed, overheal, waste;
 
+    -- Get incoming heals from other healers (HealComm integration)
+    local incomingHeal = 0;
+    if HealComm and HealComm.getHeal then
+        incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0;
+    end
+
     -- Determine healneed on HealingTarget
     if QuickHeal_UnitHasHealthInfo(HealingTarget) then
         -- Full info available
@@ -1053,14 +1120,21 @@ UpdateQuickHealOverhealStatus = function(multiplier)
             QuickHeal_debug("OVERHEAL OVERHEAL OVERHEAL");
         end
 
-        healneed = UnitHealthMax(HealingTarget) - UnitHealth(HealingTarget);
-        healthpercentage = UnitHealth(HealingTarget) / UnitHealthMax(HealingTarget);
-        healthpercentagepost = (UnitHealth(HealingTarget) + HealingSpellSize) / UnitHealthMax(HealingTarget);
+        -- Account for incoming heals in healneed calculation
+        local currentHealth = UnitHealth(HealingTarget) + incomingHeal;
+        local maxHealth = UnitHealthMax(HealingTarget);
+        healneed = maxHealth - currentHealth;
+        if healneed < 0 then healneed = 0; end
+        healthpercentage = currentHealth / maxHealth;
+        healthpercentagepost = (currentHealth + HealingSpellSize) / maxHealth;
     else
         -- Estimate target health
         healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
+        -- Reduce healneed by incoming heals (estimate based on percentage)
+        healneed = healneed - incomingHeal;
+        if healneed < 0 then healneed = 0; end
         healthpercentage = UnitHealth(HealingTarget) / 100;
-        healthpercentagepost = healthpercentage + HealingSpellSize * (1 - healthpercentage) / healneed;
+        healthpercentagepost = healthpercentage + HealingSpellSize * (1 - healthpercentage) / (healneed > 0 and healneed or 1);
     end
 
     -- Determine overheal
@@ -1118,10 +1192,10 @@ local function StartMonitor(Target, multiplier)
     MassiveOverhealInProgress = false;
     HealingTarget = Target;
 
-    if not multiplier then
-
-    else
+    if multiplier then
         HealMultiplier = multiplier;
+    else
+        HealMultiplier = 1.0;
     end
 
 
@@ -1476,6 +1550,53 @@ function QuickHeal_Toggle_Healthy_Threshold()
 end
 
 --[ Buff and Debuff detection ]--
+
+-- Detects if a buff is present on the unit by spell ID (SuperWoW enhanced)
+-- Returns: apps (application count), spellId if found; false otherwise
+function QuickHeal_DetectBuffBySpellId(unit, spellId)
+    if not has_superwow then return false end
+    local i = 1
+    while true do
+        local texture, apps, auraSpellId = UnitBuff(unit, i)
+        if not texture then return false end
+        if auraSpellId and auraSpellId == spellId then
+            return apps, auraSpellId
+        end
+        i = i + 1
+    end
+end
+
+-- Detects if a debuff is present on the unit by spell ID (SuperWoW enhanced)
+-- Returns: apps (application count), spellId if found; false otherwise
+function QuickHeal_DetectDebuffBySpellId(unit, spellId)
+    if not has_superwow then return false end
+    local i = 1
+    while true do
+        local texture, apps, auraSpellId = UnitDebuff(unit, i)
+        if not texture then return false end
+        if auraSpellId and auraSpellId == spellId then
+            return apps, auraSpellId
+        end
+        i = i + 1
+    end
+end
+
+-- Get all buff spell IDs on a unit (Nampower enhanced)
+-- Returns: table of spell IDs, or empty table if not available
+function QuickHeal_GetUnitBuffIds(unit)
+    local buffIds = {}
+    if has_nampower and GetUnitField then
+        local success, auras = pcall(GetUnitField, unit, "aura")
+        if success and auras then
+            for i, spellId in ipairs(auras) do
+                if spellId and spellId > 0 then
+                    buffIds[spellId] = true
+                end
+            end
+        end
+    end
+    return buffIds
+end
 
 -- Detects if a buff is present on the unit and returns the application number
 function QuickHeal_DetectBuff(unit, name, app)
@@ -2665,6 +2786,44 @@ local function ExecuteHeal(Target, SpellID)
     -- Setup the monitor and related events
     StartMonitor(Target);
 
+    -- Get spell info
+    local SpellName, SpellRank = GetSpellName(SpellID, BOOKTYPE_SPELL);
+    if SpellRank == "" then
+        SpellRank = nil
+    end
+    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
+
+    QuickHeal_debug("  Casting: " ..
+        SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
+
+    -- Clear any pending spells
+    if SpellIsTargeting() then
+        SpellStopTargeting()
+    end
+
+    -- Method 1: SuperWoW GUID targeting (no target switching needed)
+    local guid = QH_GetUnitGUID(Target)
+    if guid then
+        QuickHeal_debug("Using GUID targeting: " .. guid)
+
+        -- Show notifications
+        Notification(Target, SpellNameAndRank);
+        if UnitIsUnit(Target, 'player') then
+            Message(string.format("Casting %s on yourself", SpellNameAndRank), "Healing", 3)
+        else
+            Message(string.format("Casting %s on %s", SpellNameAndRank, UnitFullName(Target)), "Healing", 3)
+        end
+
+        -- Cast with GUID targeting
+        if has_pepo_nam and CastSpellByNameNoQueue then
+            CastSpellByNameNoQueue(SpellNameAndRank, guid)
+        else
+            CastSpellByName(SpellNameAndRank, guid)
+        end
+        return
+    end
+
+    -- Method 2: Traditional targeting (fallback when SuperWoW not available)
     -- Supress sound from target-switching
     local OldPlaySound = PlaySound;
     PlaySound = function()
@@ -2689,23 +2848,12 @@ local function ExecuteHeal(Target, SpellID)
         end
     end
 
-    -- Get spell info
-    local SpellName, SpellRank = GetSpellName(SpellID, BOOKTYPE_SPELL);
-    if SpellRank == "" then
-        SpellRank = nil
+    -- Cast the spell (use no-queue if Nampower available)
+    if has_pepo_nam and CastSpellByNameNoQueue then
+        CastSpellByNameNoQueue(SpellNameAndRank)
+    else
+        CastSpell(SpellID, BOOKTYPE_SPELL);
     end
-    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
-
-    QuickHeal_debug("  Casting: " ..
-        SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
-
-    -- Clear any pending spells
-    if SpellIsTargeting() then
-        SpellStopTargeting()
-    end
-
-    -- Cast the spell
-    CastSpell(SpellID, BOOKTYPE_SPELL);
 
     -- Target == 'target'
     -- Instant channeling --> succesful cast
@@ -2758,9 +2906,44 @@ end
 local function ExecuteHOT(Target, SpellID)
     local TargetWasChanged = false;
 
-    -- Setup the monitor and related events
-    --StartMonitor(Target);
+    -- Get spell info
+    local SpellName, SpellRank = GetSpellName(SpellID, BOOKTYPE_SPELL);
+    if SpellRank == "" then
+        SpellRank = nil
+    end
+    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
 
+    QuickHeal_debug("  Casting: " ..
+        SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
+
+    -- Clear any pending spells
+    if SpellIsTargeting() then
+        SpellStopTargeting()
+    end
+
+    -- Method 1: SuperWoW GUID targeting (no target switching needed)
+    local guid = QH_GetUnitGUID(Target)
+    if guid then
+        QuickHeal_debug("Using GUID targeting: " .. guid)
+
+        -- Show notifications
+        Notification(Target, SpellNameAndRank);
+        if UnitIsUnit(Target, 'player') then
+            Message(string.format("Casting %s on yourself", SpellNameAndRank), "Healing", 3)
+        else
+            Message(string.format("Casting %s on %s", SpellNameAndRank, UnitFullName(Target)), "Healing", 3)
+        end
+
+        -- Cast with GUID targeting
+        if has_pepo_nam and CastSpellByNameNoQueue then
+            CastSpellByNameNoQueue(SpellNameAndRank, guid)
+        else
+            CastSpellByName(SpellNameAndRank, guid)
+        end
+        return
+    end
+
+    -- Method 2: Traditional targeting (fallback when SuperWoW not available)
     -- Supress sound from target-switching
     local OldPlaySound = PlaySound;
     PlaySound = function()
@@ -2785,38 +2968,12 @@ local function ExecuteHOT(Target, SpellID)
         end
     end
 
-    -- Get spell info
-    local SpellName, SpellRank = GetSpellName(SpellID, BOOKTYPE_SPELL);
-    if SpellRank == "" then
-        SpellRank = nil
+    -- Cast the spell (use no-queue if Nampower available)
+    if has_pepo_nam and CastSpellByNameNoQueue then
+        CastSpellByNameNoQueue(SpellNameAndRank)
+    else
+        CastSpell(SpellID, BOOKTYPE_SPELL);
     end
-    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
-
-    QuickHeal_debug("  Casting: " ..
-        SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
-
-    -- Clear any pending spells
-    if SpellIsTargeting() then
-        SpellStopTargeting()
-    end
-
-    -- Cast the spell
-    CastSpell(SpellID, BOOKTYPE_SPELL);
-
-    -- Target == 'target'
-    -- Instant channeling --> succesful cast
-    -- Instant channeling --> instant 'out of range' fail
-    -- Instant channeling --> delayed 'line of sight' fail
-    -- No channeling --> SpellStillTargeting (unhealable NPC's, duelists etc.)
-
-    -- Target ~= 'target'
-    -- SpellCanTargetUnit == true
-    -- Channeling --> succesful cast
-    -- Channeling --> instant 'out of range' fail
-    -- Channeling --> delayed 'line of sight' fail
-    -- No channeling --> SpellStillTargeting (unknown circumstances)
-    -- SpellCanTargetUnit == false
-    -- Duels/unhealable NPC's etc.
 
     -- The spell is awaiting target selection, write to screen if the spell can actually be cast
     if SpellCanTargetUnit(Target) or ((Target == 'target') and HealingTarget) then
@@ -2835,7 +2992,6 @@ local function ExecuteHOT(Target, SpellID)
 
     -- just in case something went wrong here (Healing people in duels!)
     if SpellIsTargeting() then
-        StopMonitor("Spell cannot target " .. (UnitFullName(Target) or "unit"));
         SpellStopTargeting()
     end
 
@@ -3013,18 +3169,18 @@ function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
             if slist[0] then
                 -- Spell does not have different ranks use entry 0
                 SpellID = slist[0].SpellID;
-                --HealingSpellSize = slist[0].Heal;
+                HealingSpellSize = slist[0].Heal or 0;
             elseif table.getn(slist) > 0 then
                 -- Spell has different ranks get the one specified or choose max rank
                 srank = tonumber(srank);
                 if srank and slist[srank] then
                     -- Rank specified and exists
                     SpellID = slist[srank].SpellID;
-                    --HealingSpellSize = slist[srank].Heal;
+                    HealingSpellSize = slist[srank].Heal or 0;
                 else
                     -- rank not specified or does not exist, use max rank
                     SpellID = slist[table.getn(slist)].SpellID;
-                    --HealingSpellSize = slist[table.getn(slist)].Heal;
+                    HealingSpellSize = slist[table.getn(slist)].Heal or 0;
                 end
             end
         end
@@ -3209,18 +3365,18 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
             if slist[0] then
                 -- Spell does not have different ranks use entry 0
                 SpellID = slist[0].SpellID;
-                --HealingSpellSize = slist[0].Heal;
+                HealingSpellSize = slist[0].Heal or 0;
             elseif table.getn(slist) > 0 then
                 -- Spell has different ranks get the one specified or choose max rank
                 srank = tonumber(srank);
                 if srank and slist[srank] then
                     -- Rank specified and exists
                     SpellID = slist[srank].SpellID;
-                    --HealingSpellSize = slist[srank].Heal;
+                    HealingSpellSize = slist[srank].Heal or 0;
                 else
                     -- rank not specified or does not exist, use max rank
                     SpellID = slist[table.getn(slist)].SpellID;
-                    --HealingSpellSize = slist[table.getn(slist)].Heal;
+                    HealingSpellSize = slist[table.getn(slist)].Heal or 0;
                 end
             end
         end
@@ -3340,12 +3496,15 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
             local slist = QuickHeal_GetSpellInfo(sname);
             if slist[0] then
                 SpellID = slist[0].SpellID;
+                HealingSpellSize = slist[0].Heal or 0;
             elseif table.getn(slist) > 0 then
                 srank = tonumber(srank);
                 if srank and slist[srank] then
                     SpellID = slist[srank].SpellID;
+                    HealingSpellSize = slist[srank].Heal or 0;
                 else
                     SpellID = slist[table.getn(slist)].SpellID;
+                    HealingSpellSize = slist[table.getn(slist)].Heal or 0;
                 end
             end
         end
