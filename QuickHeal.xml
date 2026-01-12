@@ -222,7 +222,7 @@
     <Frame name="QuickHealConfig" frameStrata="DIALOG" toplevel="true" parent="UIParent" hidden="true" movable="true"
            enableMouse="true">
         <Size>
-            <AbsDimension x="600" y="270"/>
+            <AbsDimension x="600" y="350"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -380,7 +380,7 @@
     <Frame name="QuickHealConfig_GeneralOptionsFrame" frameStrata="DIALOG" toplevel="true" parent="QuickHealConfig"
            hidden="false">
         <Size>
-            <AbsDimension x="600" y="270"/>
+            <AbsDimension x="600" y="320"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -469,6 +469,32 @@
                         <Anchor point="TOPLEFT">
                             <Offset>
                                 <AbsDimension x="65" y="-217"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+
+            <!-- OverhealCancelThreshold Text -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextOverhealCancelThreshold" inherits="GameFontNormalSmall" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="65" y="-242"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+
+            <!-- StopcastDurationThreshold Text -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextStopcastDurationThreshold" inherits="GameFontNormalSmall" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="65" y="-272"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -736,18 +762,34 @@
                     </Anchor>
                 </Anchors>
                 <Scripts>
-                    <onClick>
+                    <OnClick>
                         if this:GetChecked() then
                         QuickHealVariables.StopcastEnabled = true;
+                        QuickHealConfig_OverhealCancelThresholdSlider:Show();
+                        QuickHealConfig_TextOverhealCancelThreshold:Show();
+                        QuickHealConfig_StopcastDurationThresholdSlider:Show();
+                        QuickHealConfig_TextStopcastDurationThreshold:Show();
                         else
                         QuickHealVariables.StopcastEnabled = false;
+                        QuickHealConfig_OverhealCancelThresholdSlider:Hide();
+                        QuickHealConfig_TextOverhealCancelThreshold:Hide();
+                        QuickHealConfig_StopcastDurationThresholdSlider:Hide();
+                        QuickHealConfig_TextStopcastDurationThreshold:Hide();
                         end
-                    </onClick>
+                    </OnClick>
                     <OnShow>
                         if QuickHealVariables.StopcastEnabled then
                         this:SetChecked(true);
+                        QuickHealConfig_OverhealCancelThresholdSlider:Show();
+                        QuickHealConfig_TextOverhealCancelThreshold:Show();
+                        QuickHealConfig_StopcastDurationThresholdSlider:Show();
+                        QuickHealConfig_TextStopcastDurationThreshold:Show();
                         else
                         this:SetChecked(false);
+                        QuickHealConfig_OverhealCancelThresholdSlider:Hide();
+                        QuickHealConfig_TextOverhealCancelThreshold:Hide();
+                        QuickHealConfig_StopcastDurationThresholdSlider:Hide();
+                        QuickHealConfig_TextStopcastDurationThreshold:Hide();
                         end
                     </OnShow>
                     <OnEnter>
@@ -762,6 +804,84 @@
                 </Scripts>
             </CheckButton>
 
+            <!-- OverhealCancelThreshold Slider -->
+            <Slider name="QuickHealConfig_OverhealCancelThresholdSlider" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="240" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="65" y="-255"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(0,100);
+                        this:SetValueStep(1);
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["OverhealCancelThreshold"] = this:GetValue();
+                        QuickHealConfig_TextOverhealCancelThreshold:SetText("Overheal Cancel Threshold: " .. this:GetValue() .. "%");
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["OverhealCancelThreshold"] or 50);
+                        if not QuickHealVariables.StopcastEnabled then
+                            this:Hide();
+                        end
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText("Cancel healing if the waste exceeds this percentage.");
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- StopcastDurationThreshold Slider -->
+            <Slider name="QuickHealConfig_StopcastDurationThresholdSlider" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="240" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="65" y="-285"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(0,3);
+                        this:SetValueStep(0.1);
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["StopcastDurationThreshold"] = this:GetValue();
+                        QuickHealConfig_TextStopcastDurationThreshold:SetText("Cancel Window: " .. string.format("%.1fs", this:GetValue()));
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["StopcastDurationThreshold"] or 0);
+                        if not QuickHealVariables.StopcastEnabled then
+                            this:Hide();
+                        end
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText("Only cancel overheal if remaining cast time is less than this value (Seconds). 0 to disable.");
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
         </Frames>
     </Frame>
 
@@ -769,7 +889,7 @@
     <Frame name="QuickHealConfig_MessagesAndNotificationFrame" frameStrata="DIALOG" toplevel="true"
            parent="QuickHealConfig" hidden="true">
         <Size>
-            <AbsDimension x="600" y="270"/>
+            <AbsDimension x="600" y="320"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>

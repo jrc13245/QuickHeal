@@ -61,6 +61,7 @@ local DQHV = { -- Default values
     QuickClickEnabled = true,
     StopcastEnabled = true,
     OverhealCancelThreshold = 50,
+    StopcastDurationThreshold = 0, -- 0 = disable (always cancel), >0 = cancel only if remaining < value
     MTList = {},
     SkipList = {},
     MinrankValueNH = 1, -- Minimum rank for Normal Heal (HT/FH/etc)
@@ -150,6 +151,16 @@ local function QH_GetSpellInfo(spellId)
         end
     end
     return nil
+end
+
+local function QH_GetRemainingCastTime()
+    if has_nampower and GetCastInfo then
+        local success, castInfo = pcall(GetCastInfo)
+        if success and castInfo then
+            return math.max(0, castInfo.castEndS - GetTime())
+        end
+    end
+    return 0
 end
 
 -- Global function to report DLL status (can be called from /qh dll)
@@ -1075,9 +1086,24 @@ UpdateQuickHealOverhealStatus = function(multiplier)
 
     -- Cancel heal if overheal exceeds threshold
     if QHV.StopcastEnabled and QHV.OverhealCancelThreshold and QHV.OverhealCancelThreshold > 0 and waste >= QHV.OverhealCancelThreshold then
-        SpellStopCasting()
-        StopMonitor("Overheal threshold exceeded (" .. floor(waste) .. "%)")
-        return
+        -- Check if we are in the "Cancel Window" (last X seconds)
+        local allowCancel = true
+        if QHV.StopcastDurationThreshold and QHV.StopcastDurationThreshold > 0 then
+            local remaining = QH_GetRemainingCastTime()
+            -- If remaining time > threshold, we continue casting (waiting for cancel window)
+            if remaining > QHV.StopcastDurationThreshold then
+                allowCancel = false
+            end
+            QuickHeal_debug(string.format("Overheal cancel check: remaining=%.2fs, threshold=%.2fs, allowCancel=%s",
+                remaining, QHV.StopcastDurationThreshold, tostring(allowCancel)))
+        end
+
+        if allowCancel then
+            QuickHeal_debug(string.format("Cancelling spell: waste=%.1f%%", waste))
+            SpellStopCasting()
+            StopMonitor("Overheal threshold exceeded (" .. floor(waste) .. "%)")
+            return
+        end
     end
 
     UpdateHealingBar(healthpercentage, healthpercentagepost, UnitFullName(HealingTarget))
