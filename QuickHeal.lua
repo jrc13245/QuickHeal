@@ -1017,34 +1017,6 @@ function QuickHeal_HealingBar_OnUpdate(elapsed)
         return
     end
 
-    -- Check stopcast conditions
-    if QHV.StopcastEnabled then
-        -- Stop if target is dead
-        if UnitIsDeadOrGhost(HealingTarget) then
-            SpellStopCasting()
-            StopMonitor("Target died")
-            return
-        end
-        -- Stop if target moved out of range/LOS
-        if not QH_InLineOfSight('player', HealingTarget) then
-            SpellStopCasting()
-            StopMonitor("Target out of line of sight")
-            return
-        end
-        -- Stop if target health is above the full threshold
-        local healthPct
-        if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-            local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-            healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
-        else
-            healthPct = QH_GetUnitHealth(HealingTarget) / 100
-        end
-        if healthPct >= QHV.RatioFull then
-            SpellStopCasting()
-            StopMonitor("Heal no longer needed")
-            return
-        end
-    end
 
     -- Update overheal status (this also handles overheal cancellation)
     UpdateQuickHealOverhealStatus()
@@ -1084,27 +1056,6 @@ UpdateQuickHealOverhealStatus = function(multiplier)
         waste = 0;
     end
 
-    -- Cancel heal if overheal exceeds threshold
-    if QHV.StopcastEnabled and QHV.OverhealCancelThreshold and QHV.OverhealCancelThreshold > 0 and waste >= QHV.OverhealCancelThreshold then
-        -- Check if we are in the "Cancel Window" (last X seconds)
-        local allowCancel = true
-        if QHV.StopcastDurationThreshold and QHV.StopcastDurationThreshold > 0 then
-            local remaining = QH_GetRemainingCastTime()
-            -- If remaining time > threshold, we continue casting (waiting for cancel window)
-            if remaining > QHV.StopcastDurationThreshold then
-                allowCancel = false
-            end
-            QuickHeal_debug(string.format("Overheal cancel check: remaining=%.2fs, threshold=%.2fs, allowCancel=%s",
-                remaining, QHV.StopcastDurationThreshold, tostring(allowCancel)))
-        end
-
-        if allowCancel then
-            QuickHeal_debug(string.format("Cancelling spell: waste=%.1f%%", waste))
-            SpellStopCasting()
-            StopMonitor("Overheal threshold exceeded (" .. floor(waste) .. "%)")
-            return
-        end
-    end
 
     UpdateHealingBar(healthpercentage, healthpercentagepost, UnitFullName(HealingTarget))
 
@@ -1224,40 +1175,7 @@ end
 
 -- Called whenever a registered event occurs
 function QuickHeal_OnEvent()
-    if (event == "UNIT_HEALTH") then
-        -- Triggered when someone in the party/raid, current target or mouseover is healed/damaged
-        if UnitIsUnit(HealingTarget, arg1) then
-            UpdateQuickHealOverhealStatus()
-            -- Check if we should stop casting because heal is no longer needed
-            if QHV.StopcastEnabled then
-                -- Stop if target is dead
-                if UnitIsDeadOrGhost(HealingTarget) then
-                    SpellStopCasting()
-                    StopMonitor("Target died")
-                    return
-                end
-                -- Stop if target moved out of range/LOS (using UnitXP if available)
-                if not QH_InLineOfSight('player', HealingTarget) then
-                    SpellStopCasting()
-                    StopMonitor("Target out of line of sight")
-                    return
-                end
-                -- Stop if target health (including incoming heals) is above the full threshold
-                local healthPct
-                if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-                    local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-                    healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
-                else
-                    healthPct = QH_GetUnitHealth(HealingTarget) / 100
-                end
-                if healthPct >= QHV.RatioFull then
-                    SpellStopCasting()
-                    StopMonitor("Heal no longer needed")
-                    return
-                end
-            end
-        end
-    elseif (event == "SPELLCAST_STOP") or (event == "SPELLCAST_FAILED") or (event == "SPELLCAST_INTERRUPTED") then
+    if (event == "SPELLCAST_STOP") or (event == "SPELLCAST_FAILED") or (event == "SPELLCAST_INTERRUPTED") then
         -- Spellcasting has stopped
         StopMonitor(event);
     elseif (event == "LEARNED_SPELL_IN_TAB") then
@@ -3076,15 +2994,91 @@ end
 -- Heals the specified Target with the specified Spell
 -- If parameters are missing they will be determined automatically
 function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
+    -- Check if we are currently casting and need to stop (Hardware event required for SpellStopCasting)
+    if HealingTarget and QHV.StopcastEnabled then
+        local shouldStop = false
+        local stopReason = ""
+
+        -- 1. Target dead
+        if UnitIsDeadOrGhost(HealingTarget) then
+            shouldStop = true
+            stopReason = "Target died"
+        end
+
+        -- 2. Target LOS (skip for performance/redundancy with OnUpdate?)
+        -- OnUpdate handles this, but if we want immediate cancel on keypress:
+        if not shouldStop and not QH_InLineOfSight('player', HealingTarget) then
+            shouldStop = true
+            stopReason = "Target out of line of sight"
+        end
+
+        -- 3. Target full
+        if not shouldStop then
+            local healthPct
+            if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+                local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
+                healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+            else
+                healthPct = QH_GetUnitHealth(HealingTarget) / 100
+            end
+            if healthPct >= QHV.RatioFull then
+                shouldStop = true
+                stopReason = "Heal no longer needed"
+            end
+        end
+
+        -- 4. Overheal threshold
+        if not shouldStop and QHV.OverhealCancelThreshold and QHV.OverhealCancelThreshold > 0 then
+            local healneed
+            if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+                healneed = UnitHealthMax(HealingTarget) - UnitHealth(HealingTarget);
+            else
+                healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
+            end
+            local overheal = HealingSpellSize - healneed;
+            local waste = 0
+            if HealingSpellSize > 0 then
+                waste = overheal / HealingSpellSize * 100;
+            end
+
+            if waste >= QHV.OverhealCancelThreshold then
+                local allowCancel = true
+                if QHV.StopcastDurationThreshold and QHV.StopcastDurationThreshold > 0 then
+                    local remaining = QH_GetRemainingCastTime()
+                    if remaining > QHV.StopcastDurationThreshold then
+                        allowCancel = false
+                    end
+                    -- Debug output to help diagnose threshold issues
+                    if QHV.DebugMode then
+                        QuickHeal_debug(string.format("QH Cancel Check: waste=%.1f%%, rem=%.2fs, thresh=%.2fs, cancel=%s",
+                            waste, remaining, QHV.StopcastDurationThreshold, tostring(allowCancel)))
+                    end
+                end
+
+                if allowCancel then
+                    shouldStop = true
+                    stopReason = "Overheal threshold exceeded (" .. floor(waste) .. "%)"
+                end
+            end
+        end
+
+        if shouldStop then
+            SpellStopCasting()
+            StopMonitor(stopReason)
+            return
+        else
+            -- If we are casting and decided NOT to stop, return to avoid re-executing heal logic/queueing
+            -- This prevents "looping" and spamming CastSpell while busy
+            if QH_GetRemainingCastTime() > 0 then
+                return
+            end
+        end
+    end
+
     -- Only one instance of QuickHeal allowed at a time
     --if QuickHealBusy then
-    --if HealingTarget and MassiveOverhealInProgress then
-    --QuickHeal_debug("Massive overheal aborted.");
-    --SpellStopCasting();
-    --else
-    --QuickHeal_debug("Healing in progress, command ignored");
-    --end
-    --return ;
+        --QuickHeal_debug("Healing in progress, command ignored");
+        --return ;
     --end
 
     QuickHealBusy = true;
