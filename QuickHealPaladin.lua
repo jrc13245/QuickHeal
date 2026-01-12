@@ -164,7 +164,7 @@ function QuickHeal_Paladin_FindSpellToUse(target, healType, multiplier, forceMax
     end
 
     if not forceMaxHPS or not incombat then
-        if Health < RatioFull or not target then
+        if Health < RatioFull or QHV.TestMode or not target then
             -- Default to FL rank 1 or HL rank 1
             if maxRankFL >= 1 and SpellIDsFL[1] then
                 SpellID = SpellIDsFL[1]; HealSize = (67 + healMod15) * hlMod
@@ -387,6 +387,17 @@ function QuickHeal_Command_Paladin(msg)
                 return
             end
         end
+        if arg4 == "test" then
+            if arg5 == "on" then
+                QHV.TestMode = true
+                writeLine("QuickHeal: Test mode enabled (ignoring health thresholds)", 0, 1, 0)
+                return
+            elseif arg5 == "off" then
+                QHV.TestMode = false
+                writeLine("QuickHeal: Test mode disabled", 1, 1, 0)
+                return
+            end
+        end
         if arg4 == "heal" and arg5 == "max" then
             QuickHeal(nil, nil, nil, true)
             return
@@ -464,14 +475,17 @@ function QuickHeal_Command_Paladin(msg)
     -- Print usage
     writeLine("== QUICKHEAL USAGE : PALADIN ==")
     writeLine("/qh cfg - Opens up the configuration panel.")
+    writeLine("/qh test on|off - Toggles test mode (ignores health thresholds).")
+    writeLine("/qh debug on|off - Toggles debug output.")
+    writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
     writeLine("/qh downrank | dr | minrank | ranks - Opens the downrank limit slider.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list.")
+    writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the ally who needs it most.")
     writeLine(" [mask]: player, target, targettarget, party, mt, nonmt, subgroup")
     writeLine(" [type]: heal (direct heal), hs (Holy Shock)")
     writeLine(" [mod]: max (max rank), fh (firehose - max rank, no hp check)")
-    writeLine("/qh reset - Reset configuration to default parameters.")
 end
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

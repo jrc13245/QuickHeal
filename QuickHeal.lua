@@ -60,8 +60,9 @@ local DQHV = { -- Default values
     DisplayHealingBar = true,
     QuickClickEnabled = true,
     StopcastEnabled = true,
-    OverhealCancelThreshold = 50,
-    StopcastDurationThreshold = 0, -- 0 = disable (always cancel), >0 = cancel only if remaining < value
+    MaxOverhealPercent = 50,
+    StopcastCheckWindow = 0, -- 0 = disable (always cancel), >0 = cancel only if remaining < value
+    TestMode = false,
     MTList = {},
     SkipList = {},
     MinrankValueNH = 1, -- Minimum rank for Normal Heal (HT/FH/etc)
@@ -385,6 +386,7 @@ function QuickHeal_SelectSpellRank(spellRanks, params)
 
     return SpellID, HealSize;
 end
+
 
 --[ Titan Panel functions ]--
 
@@ -987,15 +989,15 @@ local function UpdateHealingBar(hpcurrent, hpafter, name)
     QuickHealHealingBarStatusBar:SetStatusBarColor(red, green, 0);
 
     -- Calculate colour for heal
-    local waste;
+    local OverhealPercent;
     if hpafter > 1 and hpafter > hpcurrent then
-        waste = (hpafter - 1) / (hpafter - hpcurrent);
+        OverhealPercent = (hpafter - 1) / (hpafter - hpcurrent);
     else
-        waste = 0;
+        OverhealPercent = 0;
     end
-    red = waste > 0.1 and 1 or waste * 10;
-    green = waste < 0.1 and 1 or -2.5 * waste + 1.25;
-    if waste < 0 then
+    red = OverhealPercent > 0.1 and 1 or OverhealPercent * 10;
+    green = OverhealPercent < 0.1 and 1 or -2.5 * OverhealPercent + 1.25;
+    if OverhealPercent < 0 then
         green = 1;
         red = 0;
     end
@@ -1025,20 +1027,24 @@ end
 -- Update the Overheal status labels
 UpdateQuickHealOverhealStatus = function(multiplier)
     local textframe = getglobal("QuickHealOverhealStatus_Text");
-    local healthpercentagepost, healthpercentage, healneed, overheal, waste;
+    local healthpercentagepost, healthpercentage, healneed, overheal, OverhealPercent;
+
+    -- Get incoming heals from other healers (HealComm integration)
+    local incomingHeal = 0;
+    if HealComm and HealComm.getHeal then
+        incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0;
+    end
 
     -- Determine healneed on HealingTarget
     if QuickHeal_UnitHasHealthInfo(HealingTarget) then
         -- Full info available
-        if HealMultiplier == 1.0 then
-            QuickHeal_debug("NO OVERHEAL");
-        else
-            QuickHeal_debug("OVERHEAL OVERHEAL OVERHEAL");
-        end
-
-        healneed = UnitHealthMax(HealingTarget) - UnitHealth(HealingTarget);
-        healthpercentage = UnitHealth(HealingTarget) / UnitHealthMax(HealingTarget);
-        healthpercentagepost = (UnitHealth(HealingTarget) + HealingSpellSize) / UnitHealthMax(HealingTarget);
+        -- Account for incoming heals in healneed calculation
+        local currentHealth = UnitHealth(HealingTarget) + incomingHeal;
+        local maxHealth = UnitHealthMax(HealingTarget);
+        healneed = maxHealth - currentHealth;
+        if healneed < 0 then healneed = 0; end
+        healthpercentage = currentHealth / maxHealth;
+        healthpercentagepost = (currentHealth + HealingSpellSize) / maxHealth;
     else
         -- Estimate target health
         healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
@@ -1049,33 +1055,32 @@ UpdateQuickHealOverhealStatus = function(multiplier)
     -- Determine overheal
     overheal = HealingSpellSize - healneed;
 
-    -- Calculate waste (guard against division by zero)
+    -- Calculate OverhealPercent (guard against division by zero)
     if HealingSpellSize > 0 then
-        waste = overheal / HealingSpellSize * 100;
+        OverhealPercent = overheal / HealingSpellSize * 100;
     else
-        waste = 0;
+        OverhealPercent = 0;
     end
 
 
     UpdateHealingBar(healthpercentage, healthpercentagepost, UnitFullName(HealingTarget))
 
     -- Hide text if no overheal
-    if waste < 10 then
+    if OverhealPercent < 10 then
         textframe:SetText("")
         QuickHealOverhealStatusScreenCenter:AddMessage(" ");
         return
     end
 
     -- Update the label
-    local txt = floor(waste) .. "% of heal will be wasted (" .. floor(overheal) .. " Health)";
-    QuickHeal_debug(txt);
+    local txt = floor(OverhealPercent) .. "% of heal will be overhealed (" .. floor(overheal) .. " Health)";
 
     if QHV.OverhealMessageCastingBar then
         textframe:SetText(txt);
     end
 
     local font = textframe:GetFont();
-    if waste > 50 and HealMultiplier == 1.0 then
+    if OverhealPercent > 50 and HealMultiplier == 1.0 then
         if OverhealMessagePlaySound then
             PlaySoundFile("Sound\\Doodad\\BellTollTribal.wav")
         end
@@ -1987,14 +1992,14 @@ local function FindWhoToHeal(Restrict, extParam)
 
     -- Self Preservation
     local selfPercentage = (UnitHealth('player') + HealComm:getHeal('player')) / UnitHealthMax('player');
-    if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull) then
+    if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull or QHV.TestMode) then
         QuickHeal_debug("********** Self Preservation **********");
         return 'player';
     end
 
     -- Target Priority
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull then
+        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull or QHV.TestMode then
             QuickHeal_debug("********** Target Priority **********");
             return 'target';
         end
@@ -2100,7 +2105,7 @@ local function FindWhoToHeal(Restrict, extParam)
                     local PredictedHealthPct = (UnitHealth(unit) + IncHeal) / UnitHealthMax(unit);
                     local PredictedMissingHealth = UnitHealthMax(unit) - UnitHealth(unit) - IncHeal;
 
-                    if PredictedHealthPct < QHV.RatioFull then
+                    if PredictedHealthPct < QHV.RatioFull or QHV.TestMode then
                         local _, PlayerClass = UnitClass('player');
                         PlayerClass = string.lower(PlayerClass);
 
@@ -2163,7 +2168,7 @@ local function FindWhoToHeal(Restrict, extParam)
                         QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
                             UnitHealthMax(unit)));
                         local Health = UnitHealth(unit) / UnitHealthMax(unit);
-                        if Health < QHV.RatioFull then
+                        if Health < QHV.RatioFull or QHV.TestMode then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
                                     healingTarget = unit;
@@ -2196,10 +2201,14 @@ local function FindWhoToHeal(Restrict, extParam)
                 UnitHealthMax('target')));
             local Health;
             Health = UnitHealth('target') / 100;
-            if Health < QHV.RatioFull then
+            if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
         end
+    end
+
+    if QHV.TestMode and not healingTarget then
+        return 'player';
     end
 
     return healingTarget;
@@ -2214,7 +2223,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
 
     -- Self Preservation
     local selfPercentage = (UnitHealth('player') + HealComm:getHeal('player')) / UnitHealthMax('player');
-    if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull) then
+    if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull or QHV.TestMode) then
         QuickHeal_debug("********** Self Preservation **********");
         if PlayerClass == "priest" then
             if not UnitHasRenew('player') then
@@ -2232,7 +2241,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
 
     -- Target Priority
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull then
+        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull or QHV.TestMode then
             QuickHeal_debug("********** Target Priority **********");
             if PlayerClass == "priest" then
                 if not UnitHasRenew('target') then
@@ -2389,7 +2398,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                         --local PredictedHealthPct = (UnitHealth(unit) + IncHeal) / UnitHealthMax(unit);
                         --local PredictedMissingHealth = UnitHealthMax(unit) - UnitHealth(unit) - IncHeal;
 
-                        if PredictedHealthPct < QHV.RatioFull then
+                        if PredictedHealthPct < QHV.RatioFull or QHV.TestMode then
                             local _, PlayerClass = UnitClass('player');
                             PlayerClass = string.lower(PlayerClass);
 
@@ -2447,7 +2456,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                         QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
                             UnitHealthMax(unit)));
                         local Health = UnitHealth(unit) / UnitHealthMax(unit);
-                        if Health < QHV.RatioFull then
+                        if Health < QHV.RatioFull or QHV.TestMode then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
                                     healingTarget = unit;
@@ -2480,10 +2489,14 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                 UnitHealthMax('target')));
             local Health;
             Health = UnitHealth('target') / 100;
-            if Health < QHV.RatioFull then
+            if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
         end
+    end
+
+    if QHV.TestMode and not healingTarget then
+        return 'player';
     end
 
     return healingTarget;
@@ -2849,7 +2862,7 @@ function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
             else
                 targetPercentage = UnitHealth(Target) / 100;
             end
-            if targetPercentage < QHV.RatioFull then
+            if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
             else
                 -- Does not need healing
@@ -2999,66 +3012,55 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
         local shouldStop = false
         local stopReason = ""
 
-        -- 1. Target dead
+        -- 1. Target dead (Always stop)
         if UnitIsDeadOrGhost(HealingTarget) then
             shouldStop = true
             stopReason = "Target died"
         end
 
-        -- 2. Target LOS (skip for performance/redundancy with OnUpdate?)
-        -- OnUpdate handles this, but if we want immediate cancel on keypress:
-        if not shouldStop and not QH_InLineOfSight('player', HealingTarget) then
-            shouldStop = true
-            stopReason = "Target out of line of sight"
-        end
-
-        -- 3. Target full
+        -- Soft checks (LOS, Overheal) - respect StopcastCheckWindow
         if not shouldStop then
-            local healthPct
-            if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-                local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-                healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
-            else
-                healthPct = QH_GetUnitHealth(HealingTarget) / 100
-            end
-            if healthPct >= QHV.RatioFull then
-                shouldStop = true
-                stopReason = "Heal no longer needed"
-            end
-        end
-
-        -- 4. Overheal threshold
-        if not shouldStop and QHV.OverhealCancelThreshold and QHV.OverhealCancelThreshold > 0 then
-            local healneed
-            if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-                healneed = UnitHealthMax(HealingTarget) - UnitHealth(HealingTarget);
-            else
-                healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
-            end
-            local overheal = HealingSpellSize - healneed;
-            local waste = 0
-            if HealingSpellSize > 0 then
-                waste = overheal / HealingSpellSize * 100;
-            end
-
-            if waste >= QHV.OverhealCancelThreshold then
-                local allowCancel = true
-                if QHV.StopcastDurationThreshold and QHV.StopcastDurationThreshold > 0 then
-                    local remaining = QH_GetRemainingCastTime()
-                    if remaining > QHV.StopcastDurationThreshold then
-                        allowCancel = false
-                    end
-                    -- Debug output to help diagnose threshold issues
-                    if QHV.DebugMode then
-                        QuickHeal_debug(string.format("QH Cancel Check: waste=%.1f%%, rem=%.2fs, thresh=%.2fs, cancel=%s",
-                            waste, remaining, QHV.StopcastDurationThreshold, tostring(allowCancel)))
-                    end
+            local allowCancel = true
+            local remaining = 0
+            if QHV.StopcastCheckWindow and QHV.StopcastCheckWindow > 0 then
+                remaining = QH_GetRemainingCastTime()
+                if remaining > QHV.StopcastCheckWindow then
+                    allowCancel = false
                 end
+            end
 
-                if allowCancel then
+            if allowCancel then
+                -- 2. Target LOS
+                if not QH_InLineOfSight('player', HealingTarget) then
                     shouldStop = true
-                    stopReason = "Overheal threshold exceeded (" .. floor(waste) .. "%)"
+                    stopReason = "Target out of line of sight"
                 end
+
+                -- 3. Overheal threshold
+                if not shouldStop and QHV.MaxOverhealPercent and QHV.MaxOverhealPercent > 0 then
+                    local healneed
+                    if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+                        healneed = UnitHealthMax(HealingTarget) - UnitHealth(HealingTarget);
+                    else
+                        healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
+                    end
+                    local overheal = HealingSpellSize - healneed;
+                    local OverhealPercent = 0
+                    if HealingSpellSize > 0 then
+                        OverhealPercent = overheal / HealingSpellSize * 100;
+                    end
+
+                    if OverhealPercent >= QHV.MaxOverhealPercent then
+                        shouldStop = true
+                        stopReason = "Overheal threshold exceeded (" .. floor(OverhealPercent) .. "%)"
+                    end
+                end
+            end
+
+            -- Debug output for threshold
+            if QHV.DebugMode and QHV.StopcastCheckWindow and QHV.StopcastCheckWindow > 0 then
+                QuickHeal_debug(string.format("QH Cancel Check: rem=%.2fs, thresh=%.2fs, allowCancel=%s",
+                    remaining, QHV.StopcastCheckWindow, tostring(allowCancel)))
             end
         end
 
@@ -3122,7 +3124,7 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
             else
                 targetPercentage = UnitHealth(Target) / 100;
             end
-            if targetPercentage < QHV.RatioFull then
+            if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
             else
                 -- Does not need healing
@@ -3309,7 +3311,7 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
             else
                 targetPercentage = UnitHealth(Target) / 100;
             end
-            if targetPercentage >= QHV.RatioFull then
+            if targetPercentage >= QHV.RatioFull and not QHV.TestMode then
                 Message(string.format("%s doesn't need healing", UnitFullName(Target) or Target), "Info", 2);
                 SetCVar("autoSelfCast", AutoSelfCast);
                 QuickHealBusy = false;

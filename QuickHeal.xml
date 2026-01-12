@@ -475,9 +475,9 @@
                 </FontString>
             </Layer>
 
-            <!-- OverhealCancelThreshold Text -->
+            <!-- MaxOverhealPercent Text -->
             <Layer level="ARTWORK">
-                <FontString name="QuickHealConfig_TextOverhealCancelThreshold" inherits="GameFontNormalSmall" text="">
+                <FontString name="QuickHealConfig_TextMaxOverhealPercent" inherits="GameFontNormalSmall" text="">
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
@@ -488,9 +488,9 @@
                 </FontString>
             </Layer>
 
-            <!-- StopcastDurationThreshold Text -->
+            <!-- StopcastCheckWindow Text -->
             <Layer level="ARTWORK">
-                <FontString name="QuickHealConfig_TextStopcastDurationThreshold" inherits="GameFontNormalSmall" text="">
+                <FontString name="QuickHealConfig_TextStopcastCheckWindow" inherits="GameFontNormalSmall" text="">
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
@@ -765,31 +765,31 @@
                     <OnClick>
                         if this:GetChecked() then
                         QuickHealVariables.StopcastEnabled = true;
-                        QuickHealConfig_OverhealCancelThresholdSlider:Show();
-                        QuickHealConfig_TextOverhealCancelThreshold:Show();
-                        QuickHealConfig_StopcastDurationThresholdSlider:Show();
-                        QuickHealConfig_TextStopcastDurationThreshold:Show();
+                        QuickHealConfig_MaxOverhealPercentSlider:Show();
+                        QuickHealConfig_TextMaxOverhealPercent:Show();
+                        QuickHealConfig_StopcastCheckWindowSlider:Show();
+                        QuickHealConfig_TextStopcastCheckWindow:Show();
                         else
                         QuickHealVariables.StopcastEnabled = false;
-                        QuickHealConfig_OverhealCancelThresholdSlider:Hide();
-                        QuickHealConfig_TextOverhealCancelThreshold:Hide();
-                        QuickHealConfig_StopcastDurationThresholdSlider:Hide();
-                        QuickHealConfig_TextStopcastDurationThreshold:Hide();
+                        QuickHealConfig_MaxOverhealPercentSlider:Hide();
+                        QuickHealConfig_TextMaxOverhealPercent:Hide();
+                        QuickHealConfig_StopcastCheckWindowSlider:Hide();
+                        QuickHealConfig_TextStopcastCheckWindow:Hide();
                         end
                     </OnClick>
                     <OnShow>
                         if QuickHealVariables.StopcastEnabled then
                         this:SetChecked(true);
-                        QuickHealConfig_OverhealCancelThresholdSlider:Show();
-                        QuickHealConfig_TextOverhealCancelThreshold:Show();
-                        QuickHealConfig_StopcastDurationThresholdSlider:Show();
-                        QuickHealConfig_TextStopcastDurationThreshold:Show();
+                        QuickHealConfig_MaxOverhealPercentSlider:Show();
+                        QuickHealConfig_TextMaxOverhealPercent:Show();
+                        QuickHealConfig_StopcastCheckWindowSlider:Show();
+                        QuickHealConfig_TextStopcastCheckWindow:Show();
                         else
                         this:SetChecked(false);
-                        QuickHealConfig_OverhealCancelThresholdSlider:Hide();
-                        QuickHealConfig_TextOverhealCancelThreshold:Hide();
-                        QuickHealConfig_StopcastDurationThresholdSlider:Hide();
-                        QuickHealConfig_TextStopcastDurationThreshold:Hide();
+                        QuickHealConfig_MaxOverhealPercentSlider:Hide();
+                        QuickHealConfig_TextMaxOverhealPercent:Hide();
+                        QuickHealConfig_StopcastCheckWindowSlider:Hide();
+                        QuickHealConfig_TextStopcastCheckWindow:Hide();
                         end
                     </OnShow>
                     <OnEnter>
@@ -804,8 +804,8 @@
                 </Scripts>
             </CheckButton>
 
-            <!-- OverhealCancelThreshold Slider -->
-            <Slider name="QuickHealConfig_OverhealCancelThresholdSlider" inherits="OptionsSliderTemplate">
+            <!-- MaxOverhealPercent Slider -->
+            <Slider name="QuickHealConfig_MaxOverhealPercentSlider" inherits="OptionsSliderTemplate">
                 <Size>
                     <AbsDimension x="240" y="16"/>
                 </Size>
@@ -822,18 +822,18 @@
                         this:SetValueStep(1);
                     </OnLoad>
                     <OnValueChanged>
-                        QuickHealVariables["OverhealCancelThreshold"] = this:GetValue();
-                        QuickHealConfig_TextOverhealCancelThreshold:SetText("Overheal Cancel Threshold: " .. this:GetValue() .. "%");
+                        QuickHealVariables["MaxOverhealPercent"] = this:GetValue();
+                        QuickHealConfig_TextMaxOverhealPercent:SetText("Overheal Cancel Threshold: " .. this:GetValue() .. "%");
                     </OnValueChanged>
                     <OnShow>
-                        this:SetValue(QuickHealVariables["OverhealCancelThreshold"] or 50);
+                        this:SetValue(QuickHealVariables["MaxOverhealPercent"] or 50);
                         if not QuickHealVariables.StopcastEnabled then
                             this:Hide();
                         end
                     </OnShow>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Cancel healing if the waste exceeds this percentage.");
+                        GameTooltip:SetText("Cancel healing if the overheal percentage exceeds this percentage.");
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -843,8 +843,8 @@
                 </Scripts>
             </Slider>
 
-            <!-- StopcastDurationThreshold Slider -->
-            <Slider name="QuickHealConfig_StopcastDurationThresholdSlider" inherits="OptionsSliderTemplate">
+            <!-- StopcastCheckWindow Slider -->
+            <Slider name="QuickHealConfig_StopcastCheckWindowSlider" inherits="OptionsSliderTemplate">
                 <Size>
                     <AbsDimension x="240" y="16"/>
                 </Size>
@@ -861,11 +861,11 @@
                         this:SetValueStep(0.1);
                     </OnLoad>
                     <OnValueChanged>
-                        QuickHealVariables["StopcastDurationThreshold"] = this:GetValue();
-                        QuickHealConfig_TextStopcastDurationThreshold:SetText("Cancel Window: " .. string.format("%.1fs", this:GetValue()));
+                        QuickHealVariables["StopcastCheckWindow"] = this:GetValue();
+                        QuickHealConfig_TextStopcastCheckWindow:SetText("Cancel Window: " .. string.format("%.1fs", this:GetValue()));
                     </OnValueChanged>
                     <OnShow>
-                        this:SetValue(QuickHealVariables["StopcastDurationThreshold"] or 0);
+                        this:SetValue(QuickHealVariables["StopcastCheckWindow"] or 0);
                         if not QuickHealVariables.StopcastEnabled then
                             this:Hide();
                         end
