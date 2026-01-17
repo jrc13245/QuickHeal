@@ -9,24 +9,25 @@ local PF = QuickHeal_PenaltyFactor or {
 function QuickHeal_Priest_GetRatioHealthyExplanation()
     if QuickHealVariables.RatioHealthyPriest >= QuickHealVariables.RatioFull then
         return QUICKHEAL_SPELL_FLASH_HEAL ..
-        " will always be used in combat, and " ..
-        QUICKHEAL_SPELL_LESSER_HEAL ..
-        ", " .. QUICKHEAL_SPELL_HEAL .. " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will be used when out of combat. ";
+            " will always be used in combat, and " ..
+            QUICKHEAL_SPELL_LESSER_HEAL ..
+            ", " ..
+            QUICKHEAL_SPELL_HEAL .. " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will be used when out of combat. ";
     else
         if QuickHealVariables.RatioHealthyPriest > 0 then
             return QUICKHEAL_SPELL_FLASH_HEAL ..
-            " will be used in combat if the target has less than " ..
-            QuickHealVariables.RatioHealthyPriest * 100 ..
-            "% life, and " ..
-            QUICKHEAL_SPELL_LESSER_HEAL ..
-            ", " .. QUICKHEAL_SPELL_HEAL .. " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will be used otherwise. ";
+                " will be used in combat if the target has less than " ..
+                QuickHealVariables.RatioHealthyPriest * 100 ..
+                "% life, and " ..
+                QUICKHEAL_SPELL_LESSER_HEAL ..
+                ", " .. QUICKHEAL_SPELL_HEAL .. " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will be used otherwise. ";
         else
             return QUICKHEAL_SPELL_FLASH_HEAL ..
-            " will never be used. " ..
-            QUICKHEAL_SPELL_LESSER_HEAL ..
-            ", " ..
-            QUICKHEAL_SPELL_HEAL ..
-            " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will always be used in and out of combat. ";
+                " will never be used. " ..
+                QUICKHEAL_SPELL_LESSER_HEAL ..
+                ", " ..
+                QUICKHEAL_SPELL_HEAL ..
+                " or " .. QUICKHEAL_SPELL_GREATER_HEAL .. " will always be used in and out of combat. ";
         end
     end
 end
@@ -152,7 +153,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
 
     -- Hazza'rah buff path - force Greater Heal
     if forceGH and ManaLeft >= 351 * ihMod and maxRankGH >= 1 and downRankNH >= 8 and SpellIDsGH[1] then
-        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsGH[1]; HealSize = (838 + healMod30) * shMod
             if (healneed > (1066 + healMod30) * K * shMod or 9 <= minRankNH) and ManaLeft >= 432 * ihMod and maxRankGH >= 2 and downRankNH >= 9 and SpellIDsGH[2] then
                 SpellID = SpellIDsGH[2]; HealSize = (1066 + healMod30) * shMod
@@ -168,8 +169,8 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
             end
         end
         -- Normal healing (mana efficient)
-    elseif not incombat or TargetIsHealthy or maxRankFH < 1 then
-        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
+    elseif TargetIsHealthy or maxRankFH < 1 then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsLH[1]; HealSize = (53 + healMod15 * PF[1]) * shMod
             if (healneed > (84 + healMod20 * PF[4]) * k * shMod or 2 <= minRankNH) and ManaLeft >= 45 * ihMod and maxRankLH >= 2 and downRankNH >= 2 and SpellIDsLH[2] then
                 SpellID = SpellIDsLH[2]; HealSize = (84 + healMod20 * PF[4]) * shMod
@@ -207,7 +208,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
         end
         -- In combat, unhealthy target - use Flash Heal
     elseif not forceMaxHPS then
-        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsFH[1]; HealSize = (225 + healMod15) * shMod
             if (healneed > (297 + healMod15) * k * shMod or 2 <= minRankFH) and ManaLeft >= 155 and maxRankFH >= 2 and downRankFH >= 2 and SpellIDsFH[2] then
                 SpellID = SpellIDsFH[2]; HealSize = (297 + healMod15) * shMod
@@ -509,7 +510,8 @@ function QuickHeal_Command_Priest(msg)
     writeLine("/qh debug on|off - Toggles debug output.")
     writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
-    writeLine("/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
+    writeLine(
+        "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
     writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")

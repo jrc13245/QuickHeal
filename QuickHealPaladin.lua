@@ -23,14 +23,14 @@ function QuickHeal_Paladin_GetRatioHealthyExplanation()
     else
         if RatioHealthy > 0 then
             return QUICKHEAL_SPELL_HOLY_LIGHT ..
-            " will only be used in combat if the target has more than " ..
-            RatioHealthy * 100 ..
-            "% life, and only if the healing done is greater than the greatest " ..
-            QUICKHEAL_SPELL_FLASH_OF_LIGHT .. " available. Exception : Holy Judgement buff "
+                " will only be used in combat if the target has more than " ..
+                RatioHealthy * 100 ..
+                "% life, and only if the healing done is greater than the greatest " ..
+                QUICKHEAL_SPELL_FLASH_OF_LIGHT .. " available. Exception : Holy Judgement buff "
         else
             return QUICKHEAL_SPELL_HOLY_LIGHT ..
-            " will only be used in combat if the healing done is greater than the greatest " ..
-            QUICKHEAL_SPELL_FLASH_OF_LIGHT .. " available. Exception : Holy Judgement buff "
+                " will only be used in combat if the healing done is greater than the greatest " ..
+                QUICKHEAL_SPELL_FLASH_OF_LIGHT .. " available. Exception : Holy Judgement buff "
         end
     end
 end
@@ -163,8 +163,8 @@ function QuickHeal_Paladin_FindSpellToUse(target, healType, multiplier, forceMax
         debug("Target is healthy", Health)
     end
 
-    if not forceMaxHPS or not incombat then
-        if Health < RatioFull or QHV.TestMode or not target then
+    if not forceMaxHPS then
+        if Health < RatioFull or QHV.TestMode or not target or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             -- Default to FL rank 1 or HL rank 1
             if maxRankFL >= 1 and SpellIDsFL[1] then
                 SpellID = SpellIDsFL[1]; HealSize = (67 + healMod15) * hlMod

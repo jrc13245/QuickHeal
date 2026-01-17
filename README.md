@@ -258,6 +258,34 @@ Controls **how much overheal** is tolerated before stopping.
 
 ---
 
+## Aggro Detection and Pre-Healing
+
+QuickHeal includes advanced aggro detection features to help you pre-heal targets that are about to take damage.
+
+### How Aggro Detection Works
+
+QuickHeal detects when a friendly unit is being targeted by enemies using:
+- **GUID-based tracking**: Compares enemy target GUIDs with friendly unit GUIDs (requires Nampower DLL) - WIP 
+- **UnitIsUnit fallback**: Traditional method using unit ID comparison
+- **Spell cast events**: Tracks recent spell casts on units (requires Nampower DLL) - WIP
+
+### Precast Aggro Settings
+
+Configure aggro pre-healing in the configuration panel:
+
+- **Precast Aggro Targets**: Enable healing on aggro targets even when they don't meet normal healthy thresholds
+- **Pre-HOT Aggro Targets**: Enable HoT casting on aggro targets
+- **Aggro Target Preference**: Choose between healing highest or lowest max health aggro targets first
+
+### Example Usage
+
+```
+/qh
+```
+When aggro detection is enabled and a target has aggro, QuickHeal will heal them even if their health is above the normal healthy threshold.
+
+---
+
 ## Keybindings
 
 QuickHeal includes the following keybindings (accessible through WoW keybinding menu):
@@ -276,6 +304,29 @@ QuickHeal includes the following keybindings (accessible through WoW keybinding 
 - **QuickHeal Heal Target's Target** - Heal your target's target
 - **QuickHeal Toggle Healthy Threshold** - Toggle between Normal and High HPS modes
 - **QuickHeal Show/Hide Downrank Window** - Toggle downrank slider
+
+---
+
+## DLL Enhancements
+
+QuickHeal can utilize optional DLL enhancements for improved functionality:
+
+### Nampower
+- Provides `GetCastInfo` for accurate cast time tracking
+- `IsSpellInRange` for reliable range checking
+- `GetUnitField` for reading unit health/mana directly from memory
+- GUID-based aggro detection (TODO)
+- Spell cast event tracking (TODO)
+
+### UnitXP_SP3
+- `UnitXP("distanceBetween")` for accurate distance measurement
+- `UnitXP("inSight")` for line of sight detection
+
+### SuperWoW
+- `SpellInfo` for spell information lookup
+- GUID-based targeting for more reliable unit tracking
+
+Run `/qh dll` to check which DLLs are detected on your system.
 
 ---
 
@@ -301,3 +352,13 @@ QuickHeal includes the following keybindings (accessible through WoW keybinding 
 - Ensure QuickClick is enabled in configuration
 - Check that your unit frame addon is supported (Blizzard, Discord, Perl, X-Perl, EasyRaid, CT Raid Assist)
 - Verify Ctrl key is being held while clicking
+
+**Aggro detection not working:**
+- Check that enemies are actually targeting the unit (not just attacking nearby)
+- Enable debug mode with `/qh debug on` to see aggro detection details
+
+---
+
+## Credits
+
+QuickHeal was originally created by Thomas Thorsen, Scott Geeding, and Kostas Karachalios, with contributions from the Turtle WoW community.
