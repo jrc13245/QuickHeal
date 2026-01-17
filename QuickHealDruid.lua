@@ -201,7 +201,7 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
     -- Use Healing Touch when target is healthy, Regrowth unavailable, or forceHTinCombat
     if TargetIsHealthy or maxRankRG < 1 or forceHTinCombat or (not target and not forceMaxHPS) then
         debug("Using Healing Touch")
-        if Health < RatioFull then
+        if Health < RatioFull or QHV.TestMode then
             SpellID = SpellIDsHT[1]; HealSize = (44 + healMod15 * PF[1]) * gonMod
             if (healneed > (100 + healMod20 * PF[8]) * gonMod * k or 2 <= minRankNH) and ManaLeft >= 55 * tsMod * mgMod and maxRankHT >= 2 and downRankNH >= 2 and SpellIDsHT[2] then
                 SpellID = SpellIDsHT[2]; HealSize = (100 + healMod20 * PF[8]) * gonMod
@@ -237,7 +237,7 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
     else
         -- In combat, unhealthy target, has Regrowth - use Regrowth
         debug("In combat and target unhealthy and Regrowth available, will use Regrowth")
-        if Health < RatioFull then
+        if Health < RatioFull or QHV.TestMode then
             SpellID = SpellIDsRG[1]; HealSize = (91 + healModRG * PF.RG1) * iregMod * gonMod
             if (healneed > (176 + healModRG * PF.RG2) * iregMod * gonMod * k or 2 <= minRankFH) and ManaLeft >= 164 * tsMod * mgMod and maxRankRG >= 2 and downRankFH >= 2 and SpellIDsRG[2] then
                 SpellID = SpellIDsRG[2]; HealSize = (176 + healModRG * PF.RG2) * iregMod * gonMod
@@ -458,6 +458,17 @@ function QuickHeal_Command_Druid(msg)
                 return
             end
         end
+        if arg4 == "test" then
+            if arg5 == "on" then
+                QHV.TestMode = true
+                writeLine("QuickHeal: Test mode enabled (ignoring health thresholds)", 0, 1, 0)
+                return
+            elseif arg5 == "off" then
+                QHV.TestMode = false
+                writeLine("QuickHeal: Test mode disabled", 1, 1, 0)
+                return
+            end
+        end
         if arg4 == "heal" and arg5 == "max" then
             QuickHeal(nil, nil, nil, true)
             return
@@ -520,7 +531,7 @@ function QuickHeal_Command_Druid(msg)
         QuickHOT()
         return
     end
-    if cmd == "" then
+        if cmd == "" then
         QuickHeal(nil)
         return
     elseif cmd == "player" or cmd == "target" or cmd == "targettarget" or cmd == "party" or cmd == "subgroup" or cmd == "mt" or cmd == "nonmt" then
@@ -531,13 +542,15 @@ function QuickHeal_Command_Druid(msg)
     -- Print usage
     writeLine("== QUICKHEAL USAGE : DRUID ==")
     writeLine("/qh cfg - Opens up the configuration panel.")
+    writeLine("/qh test on|off - Toggles test mode (ignores health thresholds).")
+    writeLine("/qh debug on|off - Toggles debug output.")
+    writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
-    writeLine(
-    "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
+    writeLine("/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
+    writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")
     writeLine(" [mask]: player, target, targettarget, party, mt, nonmt, subgroup")
     writeLine(" [type]: heal (Healing Touch), hot (Rejuvenation)")
     writeLine(" [mod]: max (max rank), fh (firehose - max rank, no hp check)")
-    writeLine("/qh reset - Reset configuration to default parameters.")
 end

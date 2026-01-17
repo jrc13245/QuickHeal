@@ -152,7 +152,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
 
     -- Hazza'rah buff path - force Greater Heal
     if forceGH and ManaLeft >= 351 * ihMod and maxRankGH >= 1 and downRankNH >= 8 and SpellIDsGH[1] then
-        if Health < QuickHealVariables.RatioFull then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
             SpellID = SpellIDsGH[1]; HealSize = (838 + healMod30) * shMod
             if (healneed > (1066 + healMod30) * K * shMod or 9 <= minRankNH) and ManaLeft >= 432 * ihMod and maxRankGH >= 2 and downRankNH >= 9 and SpellIDsGH[2] then
                 SpellID = SpellIDsGH[2]; HealSize = (1066 + healMod30) * shMod
@@ -169,7 +169,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
         end
         -- Normal healing (mana efficient)
     elseif not incombat or TargetIsHealthy or maxRankFH < 1 then
-        if Health < QuickHealVariables.RatioFull then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
             SpellID = SpellIDsLH[1]; HealSize = (53 + healMod15 * PF[1]) * shMod
             if (healneed > (84 + healMod20 * PF[4]) * k * shMod or 2 <= minRankNH) and ManaLeft >= 45 * ihMod and maxRankLH >= 2 and downRankNH >= 2 and SpellIDsLH[2] then
                 SpellID = SpellIDsLH[2]; HealSize = (84 + healMod20 * PF[4]) * shMod
@@ -207,7 +207,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
         end
         -- In combat, unhealthy target - use Flash Heal
     elseif not forceMaxHPS then
-        if Health < QuickHealVariables.RatioFull then
+        if Health < QuickHealVariables.RatioFull or QHV.TestMode then
             SpellID = SpellIDsFH[1]; HealSize = (225 + healMod15) * shMod
             if (healneed > (297 + healMod15) * k * shMod or 2 <= minRankFH) and ManaLeft >= 155 and maxRankFH >= 2 and downRankFH >= 2 and SpellIDsFH[2] then
                 SpellID = SpellIDsFH[2]; HealSize = (297 + healMod15) * shMod
@@ -421,6 +421,17 @@ function QuickHeal_Command_Priest(msg)
                 return
             end
         end
+        if arg4 == "test" then
+            if arg5 == "on" then
+                QHV.TestMode = true
+                writeLine("QuickHeal: Test mode enabled (ignoring health thresholds)", 0, 1, 0)
+                return
+            elseif arg5 == "off" then
+                QHV.TestMode = false
+                writeLine("QuickHeal: Test mode disabled", 1, 1, 0)
+                return
+            end
+        end
         if arg4 == "heal" and arg5 == "max" then
             QuickHeal(nil, nil, nil, true)
             return
@@ -494,13 +505,15 @@ function QuickHeal_Command_Priest(msg)
     -- Print usage
     writeLine("== QUICKHEAL USAGE : PRIEST ==")
     writeLine("/qh cfg - Opens up the configuration panel.")
+    writeLine("/qh test on|off - Toggles test mode (ignores health thresholds).")
+    writeLine("/qh debug on|off - Toggles debug output.")
+    writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
-    writeLine(
-    "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
+    writeLine("/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
+    writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")
     writeLine(" [mask]: player, target, targettarget, party, mt, nonmt, subgroup")
     writeLine(" [type]: heal (channeled), hot (Renew)")
     writeLine(" [mod]: max (max rank), fh (firehose - max rank, no hp check)")
-    writeLine("/qh reset - Reset configuration to default parameters.")
 end
