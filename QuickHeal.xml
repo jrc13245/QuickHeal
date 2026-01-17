@@ -222,7 +222,7 @@
     <Frame name="QuickHealConfig" frameStrata="DIALOG" toplevel="true" parent="UIParent" hidden="true" movable="true"
            enableMouse="true">
         <Size>
-            <AbsDimension x="600" y="350"/>
+            <AbsDimension x="600" y="440"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -323,8 +323,8 @@
                     </Anchor>
                 </Anchors>
             </Button>
-            <!-- Custom Filtering Tab
-            <Button name="$parentTab4" inherits="QuickHeal_TabButtonTemplate" id="4" text="Target Filtering">
+            <!-- Ranks Tab -->
+            <Button name="$parentTab4" inherits="QuickHeal_TabButtonTemplate" id="4" text="Ranks">
                 <Anchors>
                     <Anchor point="TOPLEFT" relativeTo="$parentTab3" relativePoint="TOPRIGHT">
                         <Offset>
@@ -333,7 +333,7 @@
                     </Anchor>
                 </Anchors>
             </Button>
-            -->
+
             <!-- Close Button -->
             <Button name="QuickHealConfig_CloseButton" inherits="UIPanelButtonTemplate" text="OK">
                 <Size>
@@ -342,7 +342,7 @@
                 <Anchors>
                     <Anchor point="CENTER" relativePoint="BOTTOM">
                         <Offset>
-                            <AbsDimension x="60" y="35"/>
+                            <AbsDimension x="60" y="25"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -361,7 +361,7 @@
                 <Anchors>
                     <Anchor point="CENTER" relativePoint="BOTTOM">
                         <Offset>
-                            <AbsDimension x="-60" y="35"/>
+                            <AbsDimension x="-60" y="25"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -380,7 +380,7 @@
     <Frame name="QuickHealConfig_GeneralOptionsFrame" frameStrata="DIALOG" toplevel="true" parent="QuickHealConfig"
            hidden="false">
         <Size>
-            <AbsDimension x="600" y="320"/>
+            <AbsDimension x="600" y="400"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -481,7 +481,7 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="65" y="-242"/>
+                                <AbsDimension x="65" y="-255"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -494,7 +494,33 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="65" y="-272"/>
+                                <AbsDimension x="65" y="-305"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+
+            <!-- Aggro based precast Text -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextPrecastAggro" inherits="GameFontNormalSmall" text="Aggro based precast">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="365" y="-217"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+
+            <!-- Aggro based pre-HOT Text -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextPreHOTAggro" inherits="GameFontNormalSmall" text="Aggro based pre-HOT">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="365" y="-299"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -812,7 +838,7 @@
                 <Anchors>
                     <Anchor point="TOPLEFT">
                         <Offset>
-                            <AbsDimension x="65" y="-255"/>
+                            <AbsDimension x="65" y="-268"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -851,7 +877,7 @@
                 <Anchors>
                     <Anchor point="TOPLEFT">
                         <Offset>
-                            <AbsDimension x="65" y="-285"/>
+                            <AbsDimension x="65" y="-318"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -881,6 +907,174 @@
                     </OnLeave>
                 </Scripts>
             </Slider>
+
+            <!-- Aggro based precast Checkbutton -->
+            <CheckButton name="QuickHealConfig_CheckButtonPrecastAggro" inherits="OptionsCheckButtonTemplate"
+                         checked="false">
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="328" y="-208"></AbsDimension>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        if this:GetChecked() then
+                        QuickHealVariables.PrecastAggro = true;
+                        QuickHealConfig_PrecastAggroPreferenceContainer:Show();
+                        else
+                        QuickHealVariables.PrecastAggro = false;
+                        QuickHealConfig_PrecastAggroPreferenceContainer:Hide();
+                        end
+                    </OnClick>
+                    <OnShow>
+                        if QuickHealVariables.PrecastAggro then
+                        this:SetChecked(true);
+                        QuickHealConfig_PrecastAggroPreferenceContainer:Show();
+                        else
+                        this:SetChecked(false);
+                        QuickHealConfig_PrecastAggroPreferenceContainer:Hide();
+                        end
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText("Precast on aggro targets. Heals friendly units being attacked even if they don't need healing.");
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </CheckButton>
+
+            <!-- Precasting Preference Container -->
+            <Frame name="QuickHealConfig_PrecastAggroPreferenceContainer" hidden="true">
+                <Size>
+                    <AbsDimension x="200" y="50"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="365" y="-250"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString name="$parentLabel" inherits="GameFontNormalSmall" text="Precasting Preference">
+                            <Anchors>
+                                <Anchor point="TOPLEFT"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+                <Frames>
+                    <Button name="$parentComboBox" inherits="UIDropDownMenuTemplate">
+                        <Size>
+                            <AbsDimension x="160" y="32"/>
+                        </Size>
+                        <Anchors>
+                            <Anchor point="TOPLEFT">
+                                <Offset>
+                                    <AbsDimension x="0" y="-15"/>
+                                </Offset>
+                            </Anchor>
+                        </Anchors>
+                        <Scripts>
+                            <OnShow>
+                                UIDropDownMenu_Initialize(this, QuickHeal_ComboBoxPrecastAggroPreference_Fill);
+                                UIDropDownMenu_SetSelectedValue(this, QuickHealVariables["PrecastAggroPreference"] or "HIGHEST_MAX_HEALTH");
+                            </OnShow>
+                        </Scripts>
+                    </Button>
+                </Frames>
+            </Frame>
+
+            <!-- Aggro based pre-HOT Checkbutton -->
+            <CheckButton name="QuickHealConfig_CheckButtonPreHOTAggro" inherits="OptionsCheckButtonTemplate"
+                         checked="false">
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="328" y="-290"></AbsDimension>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        if this:GetChecked() then
+                        QuickHealVariables.PreHOTAggro = true;
+                        QuickHealConfig_PreHOTAggroPreferenceContainer:Show();
+                        else
+                        QuickHealVariables.PreHOTAggro = false;
+                        QuickHealConfig_PreHOTAggroPreferenceContainer:Hide();
+                        end
+                    </OnClick>
+                    <OnShow>
+                        if QuickHealVariables.PreHOTAggro then
+                        this:SetChecked(true);
+                        QuickHealConfig_PreHOTAggroPreferenceContainer:Show();
+                        else
+                        this:SetChecked(false);
+                        QuickHealConfig_PreHOTAggroPreferenceContainer:Hide();
+                        end
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText("Pre-HOT aggro targets. Applies HoTs to friendly units being attacked even if they don't need healing.");
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </CheckButton>
+
+            <!-- Pre-HOT Preference Container -->
+            <Frame name="QuickHealConfig_PreHOTAggroPreferenceContainer" hidden="true">
+                <Size>
+                    <AbsDimension x="200" y="50"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="365" y="-332"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString name="$parentLabel" inherits="GameFontNormalSmall" text="Pre-HOT Preference">
+                            <Anchors>
+                                <Anchor point="TOPLEFT"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+                <Frames>
+                    <Button name="$parentComboBox" inherits="UIDropDownMenuTemplate">
+                        <Size>
+                            <AbsDimension x="160" y="32"/>
+                        </Size>
+                        <Anchors>
+                            <Anchor point="TOPLEFT">
+                                <Offset>
+                                    <AbsDimension x="0" y="-15"/>
+                                </Offset>
+                            </Anchor>
+                        </Anchors>
+                        <Scripts>
+                            <OnShow>
+                                UIDropDownMenu_Initialize(this, QuickHeal_ComboBoxPreHOTAggroPreference_Fill);
+                                UIDropDownMenu_SetSelectedValue(this, QuickHealVariables["PreHOTAggroPreference"] or "HIGHEST_MAX_HEALTH");
+                            </OnShow>
+                        </Scripts>
+                    </Button>
+                </Frames>
+            </Frame>
 
         </Frames>
     </Frame>
@@ -1613,6 +1807,285 @@
         </Frames>
     </Frame>
 
+    <!-- Ranks Options Frame -->
+    <Frame name="QuickHealConfig_RanksFrame" frameStrata="DIALOG" toplevel="true" parent="QuickHealConfig" hidden="true">
+        <Size>
+            <AbsDimension x="600" y="360"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Layers>
+            <!-- Maximum Rank Section Header -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextMaxRank" inherits="GameFontNormal" text="Maximum Rank (Downrank)">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="32" y="-55"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Slow Heal Label (Downrank) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_Label_NH" inherits="GameFontHighlightSmall" text="Slow Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-80"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Fast Heal Label (Downrank) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_Label_FH" inherits="GameFontHighlightSmall" text="Fast Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-130"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Minimum Rank Section Header -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealConfig_TextMinRank" inherits="GameFontNormal" text="Minimum Rank (if mana permits)">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="32" y="-175"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Slow Heal Label (Minrank) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_Label_NH" inherits="GameFontHighlightSmall" text="Slow Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-200"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Fast Heal Label (Minrank) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_Label_FH" inherits="GameFontHighlightSmall" text="Fast Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-250"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Maximum rank display labels -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_RankNumberTop" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-80"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_RankNumberBot" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-130"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Minimum rank display labels -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_RankNumberTop" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-200"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_RankNumberBot" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-250"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <!-- Downrank Slider NH (Maximum) -->
+            <Slider name="QuickHealDownrank_Slider_NH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-95"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,12);
+                        this:SetValueStep(1);
+                        this:SetValue(12)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["DownrankValueNH"] = this:GetValue();
+                        QuickHealDownrank_RankNumberTop:SetText(QuickHealVariables["DownrankValueNH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["DownrankValueNH"] or 12);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealDownrank_Label_NH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- Downrank Slider FH (Maximum) -->
+            <Slider name="QuickHealDownrank_Slider_FH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-145"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,7);
+                        this:SetValueStep(1);
+                        this:SetValue(7)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["DownrankValueFH"] = this:GetValue();
+                        QuickHealDownrank_RankNumberBot:SetText(QuickHealVariables["DownrankValueFH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["DownrankValueFH"] or 7);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealDownrank_Label_FH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- Minrank Slider NH -->
+            <Slider name="QuickHealMinrank_Slider_NH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-215"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,12);
+                        this:SetValueStep(1);
+                        this:SetValue(1)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["MinrankValueNH"] = this:GetValue();
+                        QuickHealMinrank_RankNumberTop:SetText(QuickHealVariables["MinrankValueNH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["MinrankValueNH"] or 1);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealMinrank_Label_NH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- Minrank Slider FH -->
+            <Slider name="QuickHealMinrank_Slider_FH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-265"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,7);
+                        this:SetValueStep(1);
+                        this:SetValue(1)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["MinrankValueFH"] = this:GetValue();
+                        QuickHealMinrank_RankNumberBot:SetText(QuickHealVariables["MinrankValueFH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["MinrankValueFH"] or 1);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealMinrank_Label_FH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+        </Frames>
+    </Frame>
+
     <!-- Healing Target Filter Options Frame -->
     <Frame name="QuickHealConfig_HealingTargetFilterFrame" frameStrata="DIALOG" toplevel="true" parent="QuickHealConfig"
            hidden="true">
@@ -1920,139 +2393,6 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </CheckButton>
-            <!-- FilterRaidGroup6 Checkbutton -->
-            <CheckButton name="QuickHealConfig_FilterRaidGroup6CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
-                <Size><AbsDimension x="20" y="20"/></Size>
-                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="152" y="-110"></AbsDimension></Offset></Anchor></Anchors>
-                <Scripts>
-                    <onClick>
-                        if this:GetChecked() then
-                        QuickHealVariables["FilterRaidGroup6"] = false;
-                        else
-                        QuickHealVariables["FilterRaidGroup6"] = true;
-                        end
-                        if( this.tooltipShown ) then
-                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        end
-                    </onClick>
-                    <OnShow>
-                        if QuickHealVariables["FilterRaidGroup6"] then
-                        this:SetChecked(false);
-                        else
-                        this:SetChecked(true);
-                        end
-                    </OnShow>
-                    <OnEnter>
-                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        this.tooltipShown = true;
-                    </OnEnter>
-                    <OnLeave>
-                        GameTooltip:Hide();
-                        this.tooltipShown = false;
-                    </OnLeave>
-                </Scripts>
-            </CheckButton>
-            <!-- FilterRaidGroup7 Checkbutton -->
-            <CheckButton name="QuickHealConfig_FilterRaidGroup7CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
-                <Size><AbsDimension x="20" y="20"/></Size>
-                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="32" y="-130"></AbsDimension></Offset></Anchor></Anchors>
-                <Scripts>
-                    <onClick>
-                        if this:GetChecked() then
-                        QuickHealVariables["FilterRaidGroup7"] = false;
-                        else
-                        QuickHealVariables["FilterRaidGroup7"] = true;
-                        end
-                        if( this.tooltipShown ) then
-                        GameTooltip:SetText("Raid group 7 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        end
-                    </onClick>
-                    <OnShow>
-                        if QuickHealVariables["FilterRaidGroup7"] then
-                        this:SetChecked(false);
-                        else
-                        this:SetChecked(true);
-                        end
-                    </OnShow>
-                    <OnEnter>
-                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Raid group 7 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        this.tooltipShown = true;
-                    </OnEnter>
-                    <OnLeave>
-                        GameTooltip:Hide();
-                        this.tooltipShown = false;
-                    </OnLeave>
-                </Scripts>
-            </CheckButton>
-            <!-- FilterRaidGroup8 Checkbutton -->
-            <CheckButton name="QuickHealConfig_FilterRaidGroup8CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
-                <Size><AbsDimension x="20" y="20"/></Size>
-                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="152" y="-130"></AbsDimension></Offset></Anchor></Anchors>
-                <Scripts>
-                    <onClick>
-                        if this:GetChecked() then
-                        QuickHealVariables["FilterRaidGroup8"] = false;
-                        else
-                        QuickHealVariables["FilterRaidGroup8"] = true;
-                        end
-                        if( this.tooltipShown ) then
-                        GameTooltip:SetText("Raid group 8 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        end
-                    </onClick>
-                    <OnShow>
-                        if QuickHealVariables["FilterRaidGroup8"] then
-                        this:SetChecked(false);
-                        else
-                        this:SetChecked(true);
-                        end
-                    </OnShow>
-                    <OnEnter>
-                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Raid group 8 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        this.tooltipShown = true;
-                    </OnEnter>
-                    <OnLeave>
-                        GameTooltip:Hide();
-                        this.tooltipShown = false;
-                    </OnLeave>
-                </Scripts>
-            </CheckButton>
-
-            <Button name="QuickHeal_MTList" inherits="GameMenuButtonTemplate" text="MT">
-                <Size>
-                    <AbsDimension x="90" y="20"/>
-                </Size>
-                <Anchors>
-                    <Anchor point="TOPLEFT">
-                        <Offset>
-                            <AbsDimension x="375" y="-70"></AbsDimension>
-                        </Offset>
-                    </Anchor>
-                </Anchors>
-                <Scripts>
-                    <OnLoad>
-                        <!-- this:SetText(DCR_PRIORITY_SHOW); -->
-                        this:SetText(FILTER_MTLIST_SHOW);
-                    </OnLoad>
-                    <OnClick>
-                        <!-- Dcr_ShowHideMTListUI(); -->
-                        QH_ShowHideMTListUI();
-                    </OnClick>
-                    <OnEnter>
-                        <!-- Dcr_DisplayTooltip(DCR_PRIORITY_LIST, this); -->
-                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("")
-                        this.tooltipShown = true;
-                    </OnEnter>
-                    <OnLeave>
-                        <!-- DcrDisplay_Tooltip:Hide(); -->
-                        GameTooltip:Hide();
-                        this.tooltipShown = false;
-                    </OnLeave>
-                </Scripts>
             </Button>
 
         </Frames>
@@ -2152,18 +2492,26 @@
                     </Anchor>
                 </Anchors>
                 <Scripts>
-                    <OnLoad>
-                        this:SetMinMaxValues(1,12);
-                        this:SetValueStep(1);
-                        this:SetValue(12)
-                    </OnLoad>
-                    <OnValueChanged>
-                        QuickHealVariables["DownrankValueNH"] = this:GetValue();
-                        QuickHealDownrank_RankNumberTop:SetText(QuickHealVariables["DownrankValueNH"]);
-                    </OnValueChanged>
+                    <onClick>
+                        if this:GetChecked() then
+                        QuickHealVariables["FilterRaidGroup6"] = false;
+                        else
+                        QuickHealVariables["FilterRaidGroup6"] = true;
+                        end
+                        if( this.tooltipShown ) then
+                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
+                        end
+                    </onClick>
+                    <OnShow>
+                        if QuickHealVariables["FilterRaidGroup6"] then
+                        this:SetChecked(false);
+                        else
+                        this:SetChecked(true);
+                        end
+                    </OnShow>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText(QuickHealDownrank_Label_NH:GetText());
+                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2171,48 +2519,32 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </Slider>
-
-            <!-- New Label for Max Rank Slider FH -->
-            <Frame>
-                <Layers>
-                    <Layer level="ARTWORK">
-                        <FontString name="QuickHealDownrank_Label_FH" inherits="GameFontHighlightSmall" text="Fast Heal">
-                            <Anchors>
-                                <Anchor point="TOPLEFT" relativeTo="QuickHeal_DownrankSlider">
-                                    <Offset><AbsDimension x="25" y="-85"/></Offset>
-                                </Anchor>
-                            </Anchors>
-                        </FontString>
-                    </Layer>
-                </Layers>
-            </Frame>
-
-            <!-- Downrank Slider FH (Maximum) -->
-            <Slider name="QuickHealDownrank_Slider_FH" inherits="OptionsSliderTemplate">
-                <Size>
-                    <AbsDimension x="200" y="16"/>
-                </Size>
-                <Anchors>
-                    <Anchor point="TOPLEFT">
-                        <Offset>
-                            <AbsDimension x="20" y="-100"/>
-                        </Offset>
-                    </Anchor>
-                </Anchors>
+            </CheckButton>
+            <!-- FilterRaidGroup7 Checkbutton -->
+            <CheckButton name="QuickHealConfig_FilterRaidGroup7CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
+                <Size><AbsDimension x="20" y="20"/></Size>
+                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="32" y="-130"></AbsDimension></Offset></Anchor></Anchors>
                 <Scripts>
-                    <OnLoad>
-                        this:SetMinMaxValues(1,7);
-                        this:SetValueStep(1);
-                        this:SetValue(7)
-                    </OnLoad>
-                    <OnValueChanged>
-                        QuickHealVariables["DownrankValueFH"] = this:GetValue();
-                        QuickHealDownrank_RankNumberBot:SetText(QuickHealVariables["DownrankValueFH"]);
-                    </OnValueChanged>
+                    <onClick>
+                        if this:GetChecked() then
+                        QuickHealVariables["FilterRaidGroup7"] = false;
+                        else
+                        QuickHealVariables["FilterRaidGroup7"] = true;
+                        end
+                        if( this.tooltipShown ) then
+                        GameTooltip:SetText("Raid group 7 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
+                        end
+                    </onClick>
+                    <OnShow>
+                        if QuickHealVariables["FilterRaidGroup7"] then
+                        this:SetChecked(false);
+                        else
+                        this:SetChecked(true);
+                        end
+                    </OnShow>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText(QuickHealDownrank_Label_FH:GetText());
+                        GameTooltip:SetText("Raid group 7 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2220,62 +2552,29 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </Slider>
-
-            <!-- Minimum Rank Section Header -->
-            <Frame name="QuickHealDownrank_MinRankHeader">
-                <Size><AbsDimension x="200" y="16"/></Size>
-                <Anchors>
-                    <Anchor point="TOPLEFT">
-                        <Offset><AbsDimension x="20" y="-140"/></Offset>
-                    </Anchor>
-                </Anchors>
-                <Layers>
-                    <Layer level="ARTWORK">
-                        <FontString name="QuickHealDownrank_MinRankLabel" inherits="GameFontNormalSmall" text="Minimum Rank (if mana permits)">
-                            <Anchors><Anchor point="LEFT"/></Anchors>
-                        </FontString>
-                    </Layer>
-                </Layers>
-            </Frame>
-
-            <!-- New Label for Min Rank Slider NH -->
-             <Frame>
-                <Layers>
-                    <Layer level="ARTWORK">
-                        <FontString name="QuickHealMinrank_Label_NH" inherits="GameFontHighlightSmall" text="Slow Heal">
-                            <Anchors>
-                                <Anchor point="TOPLEFT" relativeTo="QuickHeal_DownrankSlider">
-                                    <Offset><AbsDimension x="25" y="-160"/></Offset>
-                                </Anchor>
-                            </Anchors>
-                        </FontString>
-                    </Layer>
-                </Layers>
-            </Frame>
-
-            <!-- Minrank Slider NH -->
-            <Slider name="QuickHealMinrank_Slider_NH" inherits="OptionsSliderTemplate" hidden="false">
-                <Size>
-                    <AbsDimension x="200" y="16"/>
-                </Size>
-                <Anchors>
-                    <Anchor point="TOPLEFT">
-                        <Offset>
-                            <AbsDimension x="20" y="-175"/>
-                        </Offset>
-                    </Anchor>
-                </Anchors>
+            </CheckButton>
+            <!-- FilterRaidGroup8 Checkbutton -->
+            <CheckButton name="QuickHealConfig_FilterRaidGroup8CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
+                <Size><AbsDimension x="20" y="20"/></Size>
+                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="152" y="-130"></AbsDimension></Offset></Anchor></Anchors>
                 <Scripts>
-                    <OnLoad>
-                        this:SetMinMaxValues(1,12);
-                        this:SetValueStep(1);
-                        this:SetValue(1)
-                    </OnLoad>
-                    <OnValueChanged>
-                        QuickHealVariables["MinrankValueNH"] = this:GetValue();
-                        QuickHealMinrank_RankNumberTop:SetText(QuickHealVariables["MinrankValueNH"]);
-                    </OnValueChanged>
+                    <onClick>
+                        if this:GetChecked() then
+                        QuickHealVariables["FilterRaidGroup8"] = false;
+                        else
+                        QuickHealVariables["FilterRaidGroup8"] = true;
+                        end
+                        if( this.tooltipShown ) then
+                        GameTooltip:SetText("Raid group 8 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
+                        end
+                    </onClick>
+                    <OnShow>
+                        if QuickHealVariables["FilterRaidGroup8"] then
+                        this:SetChecked(false);
+                        else
+                        this:SetChecked(true);
+                        end
+                    </OnShow>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
                         GameTooltip:SetText(QuickHealMinrank_Label_NH:GetText());
@@ -2286,56 +2585,42 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </Slider>
+            </CheckButton>
 
-            <!-- New Label for Min Rank Slider FH -->
-            <Frame>
-                <Layers>
-                    <Layer level="ARTWORK">
-                        <FontString name="QuickHealMinrank_Label_FH" inherits="GameFontHighlightSmall" text="Fast Heal">
-                            <Anchors>
-                                <Anchor point="TOPLEFT" relativeTo="QuickHeal_DownrankSlider">
-                                    <Offset><AbsDimension x="25" y="-215"/></Offset>
-                                </Anchor>
-                            </Anchors>
-                        </FontString>
-                    </Layer>
-                </Layers>
-            </Frame>
-
-            <!-- Minrank Slider FH -->
-            <Slider name="QuickHealMinrank_Slider_FH" inherits="OptionsSliderTemplate">
+            <Button name="QuickHeal_MTList" inherits="GameMenuButtonTemplate" text="MT">
                 <Size>
-                    <AbsDimension x="200" y="16"/>
+                    <AbsDimension x="90" y="20"/>
                 </Size>
                 <Anchors>
                     <Anchor point="TOPLEFT">
                         <Offset>
-                            <AbsDimension x="20" y="-230"/>
+                            <AbsDimension x="375" y="-70"></AbsDimension>
                         </Offset>
                     </Anchor>
                 </Anchors>
                 <Scripts>
                     <OnLoad>
-                        this:SetMinMaxValues(1,7);
-                        this:SetValueStep(1);
-                        this:SetValue(1)
+                        <!-- this:SetText(DCR_PRIORITY_SHOW); -->
+                        this:SetText(FILTER_MTLIST_SHOW);
                     </OnLoad>
-                    <OnValueChanged>
-                        QuickHealVariables["MinrankValueFH"] = this:GetValue();
-                        QuickHealMinrank_RankNumberBot:SetText(QuickHealVariables["MinrankValueFH"]);
-                    </OnValueChanged>
+                    <OnClick>
+                        <!-- Dcr_ShowHideMTListUI(); -->
+                        QH_ShowHideMTListUI();
+                    </OnClick>
                     <OnEnter>
+                        <!-- Dcr_DisplayTooltip(DCR_PRIORITY_LIST, this); -->
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
                         GameTooltip:SetText(QuickHealMinrank_Label_FH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
+                        <!-- DcrDisplay_Tooltip:Hide(); -->
                         GameTooltip:Hide();
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </Slider>
+            </Button>
+
         </Frames>
         <Layers>
             <!-- Maximum rank display labels -->

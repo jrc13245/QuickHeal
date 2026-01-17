@@ -22,15 +22,15 @@ function QuickHeal_Druid_GetRatioHealthyExplanation()
 
     if RatioHealthy >= RatioFull then
         return QUICKHEAL_SPELL_REGROWTH ..
-        " will always be used in and out of combat, and " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will never be used. "
+            " will always be used in and out of combat, and " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will never be used. "
     else
         if RatioHealthy > 0 then
             return QUICKHEAL_SPELL_REGROWTH ..
-            " will be used in combat if the target has less than " ..
-            RatioHealthy * 100 .. "% life, and " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will be used otherwise. "
+                " will be used in combat if the target has less than " ..
+                RatioHealthy * 100 .. "% life, and " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will be used otherwise. "
         else
             return QUICKHEAL_SPELL_REGROWTH ..
-            " will never be used. " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will always be used in and out of combat. "
+                " will never be used. " .. QUICKHEAL_SPELL_HEALING_TOUCH .. " will always be used in and out of combat. "
         end
     end
 end
@@ -185,7 +185,7 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
     -- Combat multipliers
     local k, K = QuickHeal_GetCombatMultipliers(incombat)
 
-    local TargetIsHealthy = Health >= RatioHealthy
+    local TargetIsHealthy = Health > RatioHealthy -- NOTE: needs to be ">" for Regrowth to be used out of combat
     local gonMod = mods.gonMod
     local tsMod = mods.tsMod
     local mgMod = mods.mgMod
@@ -201,7 +201,7 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
     -- Use Healing Touch when target is healthy, Regrowth unavailable, or forceHTinCombat
     if TargetIsHealthy or maxRankRG < 1 or forceHTinCombat or (not target and not forceMaxHPS) then
         debug("Using Healing Touch")
-        if Health < RatioFull or QHV.TestMode then
+        if Health < RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsHT[1]; HealSize = (44 + healMod15 * PF[1]) * gonMod
             if (healneed > (100 + healMod20 * PF[8]) * gonMod * k or 2 <= minRankNH) and ManaLeft >= 55 * tsMod * mgMod and maxRankHT >= 2 and downRankNH >= 2 and SpellIDsHT[2] then
                 SpellID = SpellIDsHT[2]; HealSize = (100 + healMod20 * PF[8]) * gonMod
@@ -235,9 +235,9 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
             end
         end
     else
-        -- In combat, unhealthy target, has Regrowth - use Regrowth
-        debug("In combat and target unhealthy and Regrowth available, will use Regrowth")
-        if Health < RatioFull or QHV.TestMode then
+        -- Unhealthy target, has Regrowth - use Regrowth
+        debug("Target unhealthy and Regrowth available, will use Regrowth")
+        if Health < RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsRG[1]; HealSize = (91 + healModRG * PF.RG1) * iregMod * gonMod
             if (healneed > (176 + healModRG * PF.RG2) * iregMod * gonMod * k or 2 <= minRankFH) and ManaLeft >= 164 * tsMod * mgMod and maxRankRG >= 2 and downRankFH >= 2 and SpellIDsRG[2] then
                 SpellID = SpellIDsRG[2]; HealSize = (176 + healModRG * PF.RG2) * iregMod * gonMod
@@ -531,7 +531,7 @@ function QuickHeal_Command_Druid(msg)
         QuickHOT()
         return
     end
-        if cmd == "" then
+    if cmd == "" then
         QuickHeal(nil)
         return
     elseif cmd == "player" or cmd == "target" or cmd == "targettarget" or cmd == "party" or cmd == "subgroup" or cmd == "mt" or cmd == "nonmt" then
@@ -546,7 +546,8 @@ function QuickHeal_Command_Druid(msg)
     writeLine("/qh debug on|off - Toggles debug output.")
     writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
-    writeLine("/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
+    writeLine(
+        "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
     writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")

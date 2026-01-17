@@ -24,14 +24,14 @@ function QuickHeal_Shaman_GetRatioHealthyExplanation()
     else
         if RatioHealthy > 0 then
             return QUICKHEAL_SPELL_HEALING_WAVE ..
-            " will only be used in combat if the target has more than " ..
-            RatioHealthy * 100 ..
-            "% life, and only if the healing done is greater than the greatest " ..
-            QUICKHEAL_SPELL_LESSER_HEALING_WAVE .. " available. "
+                " will only be used in combat if the target has more than " ..
+                RatioHealthy * 100 ..
+                "% life, and only if the healing done is greater than the greatest " ..
+                QUICKHEAL_SPELL_LESSER_HEALING_WAVE .. " available. "
         else
             return QUICKHEAL_SPELL_HEALING_WAVE ..
-            " will only be used in combat if the healing done is greater than the greatest " ..
-            QUICKHEAL_SPELL_LESSER_HEALING_WAVE .. " available. "
+                " will only be used in combat if the healing done is greater than the greatest " ..
+                QUICKHEAL_SPELL_LESSER_HEALING_WAVE .. " available. "
         end
     end
 end
@@ -241,10 +241,10 @@ function QuickHeal_Shaman_FindHealSpellToUse(target, healType, multiplier, force
     local k = 0.9 -- Fast spells (LHW)
     local K = 0.8 -- Slow spells (HW)
 
-    if incombat or forceMaxHPS then
+    if not TargetIsHealthy or incombat or forceMaxHPS then
         -- In combat: prefer LHW unless target is healthy
         debug("In combat, will prefer LHW")
-        if Health < RatioFull or QHV.TestMode or not target then
+        if Health < RatioFull or QHV.TestMode or not target or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             -- Default to LHW or HW
             if maxRankLHW >= 1 and SpellIDsLHW[1] then
                 SpellID = SpellIDsLHW[1]; HealSize = (174 + healModLHW) * hwMod
@@ -300,7 +300,7 @@ function QuickHeal_Shaman_FindHealSpellToUse(target, healType, multiplier, force
     else
         -- Not in combat: use closest available healing
         debug("Not in combat, will use closest available HW or LHW")
-        if Health < RatioFull or QHV.TestMode or not target then
+        if Health < RatioFull or QHV.TestMode or not target or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsHW[1]; HealSize = (39 + healMod15 * PF[1]) * hwMod
             if (healneed > (71 + healMod20 * PF[6]) * hwMod or 2 <= minRankNH) and ManaLeft >= 45 * tfMod and maxRankHW >= 2 and downRankNH >= 2 and SpellIDsHW[2] then
                 SpellID = SpellIDsHW[2]; HealSize = (71 + healMod20 * PF[6]) * hwMod
@@ -475,7 +475,8 @@ function QuickHeal_Command_Shaman(msg)
     writeLine("/qh debug on|off - Toggles debug output.")
     writeLine("/qh dll - Report DLL enhancement status.")
     writeLine("/qh toggle - Switches between High HPS and Normal HPS.")
-    writeLine("/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
+    writeLine(
+        "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
     writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")
