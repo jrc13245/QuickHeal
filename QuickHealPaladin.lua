@@ -504,7 +504,29 @@ end
 function qhHShock(SHOCKminHP)
     local target, healthPct = GetLowestHealthUnit()
     if target and healthPct < SHOCKminHP then
-        CastSpellByName("Holy Shock", target)
+        -- Check if SuperWoW is available for GUID/unit targeting
+        if SUPERWOW_VERSION then
+            CastSpellByName("Holy Shock", target)
+        else
+            -- Traditional method: target, cast, retarget
+            local hadTarget = UnitExists("target")
+            local wasEnemy = hadTarget and UnitIsEnemy("player", "target")
+
+            if target == "player" then
+                CastSpellByName("Holy Shock", true) -- true = self cast
+            elseif UnitIsUnit(target, "target") then
+                CastSpellByName("Holy Shock")
+            else
+                -- Need to switch target
+                TargetUnit(target)
+                CastSpellByName("Holy Shock")
+                if hadTarget then
+                    TargetLastTarget()
+                else
+                    ClearTarget()
+                end
+            end
+        end
     end
 end
 

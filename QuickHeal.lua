@@ -79,7 +79,8 @@ local has_nampower = type(GetCastInfo) == "function"
 -- UnitXP_SP3: Provides UnitXP("distanceBetween"), UnitXP("inSight"), etc.
 local has_unitxp = type(UnitXP) == "function" and pcall(UnitXP, "nop", "nop")
 -- SuperWoW: Provides SpellInfo, UnitPosition, GUID-based targeting, etc.
-local has_superwow = type(SUPERWOW_VERSION) ~= "nil"
+-- Detect SuperWoW using SetAutoloot (same method as SuperCleveRoidMacros)
+local has_superwow = SetAutoloot and true or false
 
 -- Helper functions that use DLL features with fallbacks
 local function QH_GetDistance(unit1, unit2)
@@ -171,7 +172,7 @@ local function QH_CastHealSpell(spellID, target)
     local SpellName, SpellRank = GetSpellName(spellID, BOOKTYPE_SPELL)
     if not SpellName then return false end
 
-    local SpellNameAndRank = SpellName .. (SpellRank and SpellRank ~= "" and " (" .. SpellRank .. ")" or "")
+    local SpellNameAndRank = SpellName .. (SpellRank and SpellRank ~= "" and "(" .. SpellRank .. ")" or "")
 
     -- Method 1: SuperWoW GUID targeting (most reliable, no target switching needed)
     if has_superwow then
@@ -244,7 +245,8 @@ local HealingTarget;                 -- Contains the unitID of the last player t
 local BlackList = {};                -- List of times were the players are no longer blacklisted
 local LastBlackListTime = 0;
 local HealMultiplier = 1.0;
-local PlayerClass = string.lower(UnitClass('player'));
+local _, PlayerClass = UnitClass('player');
+PlayerClass = PlayerClass and string.lower(PlayerClass) or "unknown";
 
 --[ Keybinding ]--
 BINDING_HEADER_QUICKHEAL = "QuickHeal";
@@ -1107,8 +1109,11 @@ local function Initialise()
         end;
     end
 
-    --local _, PlayerClass = UnitClass('player');
-    --PlayerClass = string.lower(PlayerClass);
+    -- Get class if not already set (safety check)
+    if not PlayerClass or PlayerClass == "unknown" then
+        local _, class = UnitClass('player');
+        PlayerClass = class and string.lower(class) or "unknown";
+    end
 
     if PlayerClass == "shaman" then
         FindChainHealSpellToUse = QuickHeal_Shaman_FindChainHealSpellToUse;
@@ -1550,7 +1555,7 @@ function QuickHeal_OnEvent()
         if UnitIsUnit(HealingTarget, arg1) then
             UpdateQuickHealOverhealStatus()
             -- Check if we should stop casting because heal is no longer needed
-            if QHV.StopcastEnabled then
+            if QHV.StopcastEnabled and HealingTarget then
                 -- Stop if target is dead
                 if UnitIsDeadOrGhost(HealingTarget) then
                     SpellStopCasting()
@@ -2412,16 +2417,16 @@ local function FindWhoToHeal(Restrict, extParam)
     local AllPlayersAreFull = true;
     local AllPetsAreFull = true;
 
-    -- Self Preservation
-    local selfPercentage = (UnitHealth('player') + HealComm:getHeal('player')) / UnitHealthMax('player');
+    -- Self Preservation (uses accurate health with Nampower)
+    local selfPercentage = (QH_GetUnitHealth('player') + HealComm:getHeal('player')) / QH_GetUnitMaxHealth('player');
     if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull) then
         QuickHeal_debug("********** Self Preservation **********");
         return 'player';
     end
 
-    -- Target Priority
+    -- Target Priority (uses accurate health with Nampower)
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull then
+        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull then
             QuickHeal_debug("********** Target Priority **********");
             return 'target';
         end
@@ -2517,13 +2522,15 @@ local function FindWhoToHeal(Restrict, extParam)
         if not RestrictSubgroup or RestrictParty or not InRaid() or (SubGroup and not QHV["FilterRaidGroup" .. SubGroup]) then
             if not IsBlacklisted(UnitFullName(unit)) then
                 if SpellCanTargetUnit(unit) then
-                    QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
-                        UnitHealthMax(unit)));
+                    QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
+                        QH_GetUnitMaxHealth(unit)));
 
                     local IncHeal = HealComm:getHeal(UnitName(unit))
-                    local PredictedHealth = (UnitHealth(unit) + IncHeal)
-                    local PredictedHealthPct = (UnitHealth(unit) + IncHeal) / UnitHealthMax(unit);
-                    local PredictedMissingHealth = UnitHealthMax(unit) - UnitHealth(unit) - IncHeal;
+                    local unitHealth = QH_GetUnitHealth(unit)
+                    local unitMaxHealth = QH_GetUnitMaxHealth(unit)
+                    local PredictedHealth = (unitHealth + IncHeal)
+                    local PredictedHealthPct = (unitHealth + IncHeal) / unitMaxHealth;
+                    local PredictedMissingHealth = unitMaxHealth - unitHealth - IncHeal;
 
                     if PredictedHealthPct < QHV.RatioFull then
                         local _, PlayerClass = UnitClass('player');
@@ -2581,9 +2588,9 @@ local function FindWhoToHeal(Restrict, extParam)
             if not RestrictSubgroup or RestrictParty or not InRaid() or (SubGroup and not QHV["FilterRaidGroup" .. SubGroup]) then
                 if not IsBlacklisted(UnitFullName(unit)) then
                     if SpellCanTargetUnit(unit) then
-                        QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
-                            UnitHealthMax(unit)));
-                        local Health = UnitHealth(unit) / UnitHealthMax(unit);
+                        QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
+                            QH_GetUnitMaxHealth(unit)));
+                        local Health = QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit);
                         if Health < QHV.RatioFull then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
@@ -2688,8 +2695,8 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
     local AllPlayersAreFull = true;
     local AllPetsAreFull = true;
 
-    -- Self Preservation
-    local selfPercentage = (UnitHealth('player') + HealComm:getHeal('player')) / UnitHealthMax('player');
+    -- Self Preservation (uses accurate health with Nampower)
+    local selfPercentage = (QH_GetUnitHealth('player') + HealComm:getHeal('player')) / QH_GetUnitMaxHealth('player');
     if (selfPercentage < QHV.RatioForceself) and (selfPercentage < QHV.RatioFull) then
         QuickHeal_debug("********** Self Preservation **********");
         if PlayerClass == "priest" then
@@ -2706,9 +2713,9 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
     end
 
 
-    -- Target Priority
+    -- Target Priority (uses accurate health with Nampower)
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (UnitHealth('target') / UnitHealthMax('target')) < QHV.RatioFull then
+        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull then
             QuickHeal_debug("********** Target Priority **********");
             if PlayerClass == "priest" then
                 if not UnitHasRenew('target') then
@@ -2816,16 +2823,18 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
         if not RestrictSubgroup or RestrictParty or not InRaid() or (SubGroup and not QHV["FilterRaidGroup" .. SubGroup]) then
             if not IsBlacklisted(UnitFullName(unit)) then
                 if SpellCanTargetUnit(unit) then
-                    QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
-                        UnitHealthMax(unit)));
+                    QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
+                        QH_GetUnitMaxHealth(unit)));
 
                     local _, PlayerClass = UnitClass('player');
                     PlayerClass = string.lower(PlayerClass);
 
                     local IncHeal = HealComm:getHeal(UnitName(unit))
-                    local PredictedHealth = (UnitHealth(unit) + IncHeal)
-                    local PredictedHealthPct = (UnitHealth(unit) + IncHeal) / UnitHealthMax(unit);
-                    local PredictedMissingHealth = UnitHealthMax(unit) - UnitHealth(unit) - IncHeal;
+                    local unitHealth = QH_GetUnitHealth(unit)
+                    local unitMaxHealth = QH_GetUnitMaxHealth(unit)
+                    local PredictedHealth = (unitHealth + IncHeal)
+                    local PredictedHealthPct = (unitHealth + IncHeal) / unitMaxHealth;
+                    local PredictedMissingHealth = unitMaxHealth - unitHealth - IncHeal;
 
                     if noHpCheck then
                         if PlayerClass == "priest" then
@@ -2985,9 +2994,9 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
             if not RestrictSubgroup or RestrictParty or not InRaid() or (SubGroup and not QHV["FilterRaidGroup" .. SubGroup]) then
                 if not IsBlacklisted(UnitFullName(unit)) then
                     if SpellCanTargetUnit(unit) then
-                        QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, UnitHealth(unit),
-                            UnitHealthMax(unit)));
-                        local Health = UnitHealth(unit) / UnitHealthMax(unit);
+                        QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
+                            QH_GetUnitMaxHealth(unit)));
+                        local Health = QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit);
                         if Health < QHV.RatioFull then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
@@ -3155,20 +3164,39 @@ local function ExecuteHeal(Target, SpellID)
     if SpellRank == "" then
         SpellRank = nil
     end
-    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
+    local SpellNameAndRank = SpellName .. (SpellRank and "(" .. SpellRank .. ")" or "");
 
     QuickHeal_debug("  Casting: " ..
         SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
 
-    -- Clear any pending spells
+    -- Check range and line of sight before casting (UnitXP)
+    if has_unitxp then
+        -- Check distance (40 yards for most healing spells)
+        local success, distance = pcall(UnitXP, "distanceBetween", "player", Target)
+        if success and distance and distance > 40 then
+            StopMonitor("Target out of range")
+            QuickHeal_debug("Target out of range (" .. distance .. " yards), aborting cast")
+            return
+        end
+
+        -- Check line of sight
+        if not QH_InLineOfSight('player', Target) then
+            StopMonitor("Target out of line of sight")
+            QuickHeal_debug("Target out of line of sight, aborting cast")
+            return
+        end
+    end
+
+    -- Clear any pending spell state
     if SpellIsTargeting() then
         SpellStopTargeting()
     end
+    -- Also stop any casting in progress
+    SpellStopCasting()
 
-    -- Method 1: SuperWoW GUID targeting (no target switching needed)
-    local guid = QH_GetUnitGUID(Target)
-    if guid then
-        QuickHeal_debug("Using GUID targeting: " .. guid)
+    -- Method 1: SuperWoW direct casting (no target switching needed)
+    if has_superwow then
+        QuickHeal_debug("Using SuperWoW CastSpellByName with target: " .. Target)
 
         -- Show notifications
         Notification(Target, SpellNameAndRank);
@@ -3178,16 +3206,12 @@ local function ExecuteHeal(Target, SpellID)
             Message(string.format("Casting %s on %s", SpellNameAndRank, UnitFullName(Target)), "Healing", 3)
         end
 
-        -- Cast with GUID targeting
-        if has_pepo_nam and CastSpellByNameNoQueue then
-            CastSpellByNameNoQueue(SpellNameAndRank, guid)
-        else
-            CastSpellByName(SpellNameAndRank, guid)
-        end
+        -- Cast using SuperWoW's unit targeting
+        CastSpellByName(SpellNameAndRank, Target)
         return
     end
 
-    -- Method 2: Traditional targeting (fallback when SuperWoW not available)
+    -- Method 2: Traditional targeting (fallback)
     -- Supress sound from target-switching
     local OldPlaySound = PlaySound;
     PlaySound = function()
@@ -3212,27 +3236,8 @@ local function ExecuteHeal(Target, SpellID)
         end
     end
 
-    -- Cast the spell (use no-queue if Nampower available)
-    if has_pepo_nam and CastSpellByNameNoQueue then
-        CastSpellByNameNoQueue(SpellNameAndRank)
-    else
-        CastSpell(SpellID, BOOKTYPE_SPELL);
-    end
-
-    -- Target == 'target'
-    -- Instant channeling --> succesful cast
-    -- Instant channeling --> instant 'out of range' fail
-    -- Instant channeling --> delayed 'line of sight' fail
-    -- No channeling --> SpellStillTargeting (unhealable NPC's, duelists etc.)
-
-    -- Target ~= 'target'
-    -- SpellCanTargetUnit == true
-    -- Channeling --> succesful cast
-    -- Channeling --> instant 'out of range' fail
-    -- Channeling --> delayed 'line of sight' fail
-    -- No channeling --> SpellStillTargeting (unknown circumstances)
-    -- SpellCanTargetUnit == false
-    -- Duels/unhealable NPC's etc.
+    -- Cast the spell using CastSpell (puts spell in targeting mode)
+    CastSpell(SpellID, BOOKTYPE_SPELL);
 
     -- The spell is awaiting target selection, write to screen if the spell can actually be cast
     if SpellCanTargetUnit(Target) or ((Target == 'target') and HealingTarget) then
@@ -3275,7 +3280,7 @@ local function ExecuteHOT(Target, SpellID)
     if SpellRank == "" then
         SpellRank = nil
     end
-    local SpellNameAndRank = SpellName .. (SpellRank and " (" .. SpellRank .. ")" or "");
+    local SpellNameAndRank = SpellName .. (SpellRank and "(" .. SpellRank .. ")" or "");
 
     QuickHeal_debug("  Casting: " ..
         SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);

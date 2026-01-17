@@ -2393,7 +2393,7 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </Button>
+            </CheckButton>
 
         </Frames>
     </Frame>
@@ -2492,34 +2492,25 @@
                     </Anchor>
                 </Anchors>
                 <Scripts>
-                    <onClick>
-                        if this:GetChecked() then
-                        QuickHealVariables["FilterRaidGroup6"] = false;
-                        else
-                        QuickHealVariables["FilterRaidGroup6"] = true;
-                        end
-                        if( this.tooltipShown ) then
-                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        end
-                    </onClick>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,12);
+                        this:SetValueStep(1);
+                        this:SetValue(12)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["DownrankValueNH"] = this:GetValue();
+                        QuickHealDownrank_RankNumberTop:SetText(QuickHealVariables["DownrankValueNH"]);
+                    </OnValueChanged>
                     <OnShow>
-                        if QuickHealVariables["FilterRaidGroup6"] then
-                        this:SetChecked(false);
-                        else
-                        this:SetChecked(true);
-                        end
                     </OnShow>
                     <OnEnter>
-                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Raid group 6 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
-                        this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
                         GameTooltip:Hide();
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </CheckButton>
+            </Slider>
             <!-- FilterRaidGroup7 Checkbutton -->
             <CheckButton name="QuickHealConfig_FilterRaidGroup7CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
                 <Size><AbsDimension x="20" y="20"/></Size>
