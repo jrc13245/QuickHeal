@@ -2063,7 +2063,7 @@
     <Frame name="QuickHeal_DownrankSlider" frameStrata="DIALOG" toplevel="true" parent="UIParent" hidden="true"
         movable="true" enableMouse="true">
         <Size>
-            <AbsDimension x="250" y="270"/>
+            <AbsDimension x="250" y="310"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -2278,7 +2278,7 @@
                     </OnValueChanged>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Minimum rank for " .. QuickHealMinrank_Label_NH:GetText());
+                        GameTooltip:SetText(QuickHealMinrank_Label_NH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2327,7 +2327,7 @@
                     </OnValueChanged>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Minimum rank for " .. QuickHealMinrank_Label_FH:GetText());
+                        GameTooltip:SetText(QuickHealMinrank_Label_FH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2384,7 +2384,7 @@
                     </Anchors>
                 </FontString>
             </Layer>
-            <!-- Markers (kept for compatibility) -->
+            <!-- Markers for max rank sliders -->
             <Layer level="ARTWORK">
                 <FontString name="QuickHealDownrank_MarkerTop" outline="NORMAL" inherits="GameFontNormal" text=">">
                     <Anchors>
@@ -2401,7 +2401,30 @@
                     <Anchors>
                         <Anchor point="CENTER" relativePoint="TOP">
                             <Offset>
-                                <AbsDimension x="-106" y="-88"/>
+                                <AbsDimension x="-106" y="-108"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Markers for min rank sliders -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_MarkerTop" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-183"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_MarkerBot" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-238"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
