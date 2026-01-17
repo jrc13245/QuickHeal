@@ -2393,11 +2393,104 @@
                         this.tooltipShown = false;
                     </OnLeave>
                 </Scripts>
-            </CheckButton>
-            <!-- FilterRaidGroup6 Checkbutton -->
-            <CheckButton name="QuickHealConfig_FilterRaidGroup6CheckBox" inherits="OptionsCheckButtonTemplate" checked="true">
-                <Size><AbsDimension x="20" y="20"/></Size>
-                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="152" y="-110"></AbsDimension></Offset></Anchor></Anchors>
+            </Button>
+
+        </Frames>
+    </Frame>
+
+    <!-- Downrank Slider Frame -->
+    <!-- Downrank Slider Frame -->
+    <Frame name="QuickHeal_DownrankSlider" frameStrata="DIALOG" toplevel="true" parent="UIParent" hidden="true"
+        movable="true" enableMouse="true">
+        <Size>
+            <AbsDimension x="250" y="310"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Scripts>
+            <OnLoad>
+                this:RegisterForDrag("RightButton");
+            </OnLoad>
+            <OnDragStart>
+                this:StartMoving();
+            </OnDragStart>
+            <OnDragStop>
+                this:StopMovingOrSizing();
+            </OnDragStop>
+        </Scripts>
+        <Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background"
+                edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+            <TileSize>
+                <AbsValue val="32"/>
+            </TileSize>
+            <EdgeSize>
+                <AbsValue val="8"/>
+            </EdgeSize>
+            <BackgroundInsets>
+                <AbsInset left="2" right="2" top="2" bottom="2"/>
+            </BackgroundInsets>
+        </Backdrop>
+        <Frames>
+            <Button name="$parentCloseButton" inherits="UIPanelCloseButton">
+                <Anchors>
+                    <Anchor point="TOPRIGHT">
+                        <Offset>
+                            <AbsDimension x="-2" y="-2" />
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        this:GetParent():Hide();
+                    </OnClick>
+                </Scripts>
+            </Button>
+            
+            <!-- Maximum Rank Section Header -->
+            <Frame name="QuickHealDownrank_MaxRankHeader">
+                <Size><AbsDimension x="200" y="16"/></Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset><AbsDimension x="20" y="-10"/></Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString name="QuickHealDownrank_MaxRankLabel" inherits="GameFontNormalSmall" text="Maximum Rank (Downrank)">
+                            <Anchors><Anchor point="LEFT"/></Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+            
+            <!-- New Labels for Max Rank Sliders -->
+            <Frame>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString name="QuickHealDownrank_Label_NH" inherits="GameFontHighlightSmall" text="Slow Heal">
+                            <Anchors>
+                                <Anchor point="TOPLEFT" relativeTo="QuickHeal_DownrankSlider">
+                                    <Offset><AbsDimension x="25" y="-30"/></Offset>
+                                </Anchor>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+
+            <!-- Downrank Slider NH (Maximum) -->
+            <Slider name="QuickHealDownrank_Slider_NH" inherits="OptionsSliderTemplate" hidden="false">
+                <Size>
+                    <AbsDimension x="200" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="20" y="-45"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
                 <Scripts>
                     <onClick>
                         if this:GetChecked() then
@@ -2484,7 +2577,7 @@
                     </OnShow>
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("Raid group 8 will" .. (this:GetChecked() and " " or " not ") .. "be healed.")
+                        GameTooltip:SetText(QuickHealMinrank_Label_NH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2517,7 +2610,7 @@
                     <OnEnter>
                         <!-- Dcr_DisplayTooltip(DCR_PRIORITY_LIST, this); -->
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
-                        GameTooltip:SetText("")
+                        GameTooltip:SetText(QuickHealMinrank_Label_FH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>
@@ -2529,6 +2622,100 @@
             </Button>
 
         </Frames>
+        <Layers>
+            <!-- Maximum rank display labels -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_RankNumberTop" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="108" y="-53"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_RankNumberBot" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="108" y="-108"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Minimum rank display labels -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_RankNumberTop" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="108" y="-183"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_RankNumberBot" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="108" y="-238"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Markers for max rank sliders -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_MarkerTop" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-53"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_MarkerBot" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-108"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Markers for min rank sliders -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_MarkerTop" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-183"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_MarkerBot" outline="NORMAL" inherits="GameFontNormal" text=">">
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="-106" y="-238"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
     </Frame>
 
     <!-- MTListFrame -->
