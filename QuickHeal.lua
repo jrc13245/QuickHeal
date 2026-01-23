@@ -2426,7 +2426,7 @@ local function FindWhoToHeal(Restrict, extParam)
 
     -- Target Priority (uses accurate health with Nampower)
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull then
+        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull or QHV.TestMode then
             QuickHeal_debug("********** Target Priority **********");
             return 'target';
         end
@@ -2532,7 +2532,7 @@ local function FindWhoToHeal(Restrict, extParam)
                     local PredictedHealthPct = (unitHealth + IncHeal) / unitMaxHealth;
                     local PredictedMissingHealth = unitMaxHealth - unitHealth - IncHeal;
 
-                    if PredictedHealthPct < QHV.RatioFull then
+                    if PredictedHealthPct < QHV.RatioFull or QHV.TestMode then
                         local _, PlayerClass = UnitClass('player');
                         PlayerClass = string.lower(PlayerClass);
 
@@ -2591,7 +2591,7 @@ local function FindWhoToHeal(Restrict, extParam)
                         QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
                             QH_GetUnitMaxHealth(unit)));
                         local Health = QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit);
-                        if Health < QHV.RatioFull then
+                        if Health < QHV.RatioFull or QHV.TestMode then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
                                     healingTarget = unit;
@@ -2679,7 +2679,7 @@ local function FindWhoToHeal(Restrict, extParam)
                 UnitHealthMax('target')));
             local Health;
             Health = UnitHealth('target') / 100;
-            if Health < QHV.RatioFull then
+            if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
         end
@@ -2715,7 +2715,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
 
     -- Target Priority (uses accurate health with Nampower)
     if QHV.TargetPriority and QuickHeal_UnitHasHealthInfo('target') then
-        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull then
+        if (QH_GetUnitHealth('target') / QH_GetUnitMaxHealth('target')) < QHV.RatioFull or QHV.TestMode then
             QuickHeal_debug("********** Target Priority **********");
             if PlayerClass == "priest" then
                 if not UnitHasRenew('target') then
@@ -2874,7 +2874,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                         --local PredictedHealthPct = (UnitHealth(unit) + IncHeal) / UnitHealthMax(unit);
                         --local PredictedMissingHealth = UnitHealthMax(unit) - UnitHealth(unit) - IncHeal;
 
-                        if PredictedHealthPct < QHV.RatioFull then
+                        if PredictedHealthPct < QHV.RatioFull or QHV.TestMode then
                             local _, PlayerClass = UnitClass('player');
                             PlayerClass = string.lower(PlayerClass);
 
@@ -2997,7 +2997,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                         QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(unit), unit, QH_GetUnitHealth(unit),
                             QH_GetUnitMaxHealth(unit)));
                         local Health = QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit);
-                        if Health < QHV.RatioFull then
+                        if Health < QHV.RatioFull or QHV.TestMode then
                             if ((QHV.PetPriority == 1) and AllPlayersAreFull) or (QHV.PetPriority == 2) or UnitIsUnit(unit, "target") then
                                 if Health < healingTargetHealthPct then
                                     healingTarget = unit;
@@ -3030,7 +3030,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                 UnitHealthMax('target')));
             local Health;
             Health = UnitHealth('target') / 100;
-            if Health < QHV.RatioFull then
+            if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
         end
@@ -3430,7 +3430,7 @@ function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
             else
                 targetPercentage = UnitHealth(Target) / 100;
             end
-            if targetPercentage < QHV.RatioFull then
+            if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
             else
                 -- Does not need healing
@@ -3627,7 +3627,7 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
             else
                 targetPercentage = UnitHealth(Target) / 100;
             end
-            if targetPercentage < QHV.RatioFull then
+            if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
             else
                 -- Does not need healing
