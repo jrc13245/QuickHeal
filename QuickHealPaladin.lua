@@ -63,7 +63,10 @@ local function CheckPaladinBuffs()
     local forceHL = false
 
     -- Detect Hand of Edward the Odd (next spell is instant cast)
-    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") then
+    -- Note: Must check for exact match to avoid false positive with "Protective Light"
+    -- which uses icon "Spell_Holy_SearingLightPriest"
+    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") and
+       not QuickHeal_DetectBuff('player', "Spell_Holy_SearingLightPriest") then
         QuickHeal_debug("BUFF: Hand of Edward the Odd (out of combat healing forced)")
         forceHL = true
     end

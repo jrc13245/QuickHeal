@@ -75,7 +75,9 @@ local function CheckPriestBuffs(target, inCombat, manaLeft, healneed)
     local forceGH = false
 
     -- Hand of Edward the Odd - instant cast
-    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") then
+    -- Note: Must exclude "Protective Light" which uses icon "Spell_Holy_SearingLightPriest"
+    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") and
+       not QuickHeal_DetectBuff('player', "Spell_Holy_SearingLightPriest") then
         QuickHeal_debug("BUFF: Hand of Edward the Odd (out of combat healing forced)")
         inCombat = false
     end

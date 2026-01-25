@@ -3156,6 +3156,13 @@ end
 local function ExecuteHeal(Target, SpellID)
     local TargetWasChanged = false;
 
+    -- Clear any pending spell state BEFORE starting monitor
+    -- (SpellStopCasting triggers SPELLCAST_STOP which would immediately stop monitor)
+    if SpellIsTargeting() then
+        SpellStopTargeting()
+    end
+    SpellStopCasting()
+
     -- Setup the monitor and related events
     StartMonitor(Target);
 
@@ -3186,13 +3193,6 @@ local function ExecuteHeal(Target, SpellID)
             return
         end
     end
-
-    -- Clear any pending spell state
-    if SpellIsTargeting() then
-        SpellStopTargeting()
-    end
-    -- Also stop any casting in progress
-    SpellStopCasting()
 
     -- Method 1: SuperWoW direct casting (no target switching needed)
     if has_superwow then

@@ -68,7 +68,9 @@ local function CheckShamanBuffs(inCombat)
     end
 
     -- Detect Hand of Edward the Odd (next spell is instant cast)
-    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") then
+    -- Note: Must exclude "Protective Light" which uses icon "Spell_Holy_SearingLightPriest"
+    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") and
+       not QuickHeal_DetectBuff('player', "Spell_Holy_SearingLightPriest") then
         QuickHeal_debug("BUFF: Hand of Edward the Odd (out of combat healing forced)")
         inCombat = false
     end
