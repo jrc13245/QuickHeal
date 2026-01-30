@@ -230,7 +230,7 @@
         <Scripts>
             <OnLoad>
                 this:RegisterForDrag("LeftButton");
-                PanelTemplates_SetNumTabs(this, 3);
+                PanelTemplates_SetNumTabs(this, 4);
                 PanelTemplates_SetTab(this, 1);
                 QuickHeal_OnLoad();
             </OnLoad>
@@ -1810,7 +1810,7 @@
     <!-- Ranks Options Frame -->
     <Frame name="QuickHealConfig_RanksFrame" frameStrata="DIALOG" toplevel="true" parent="QuickHealConfig" hidden="true">
         <Size>
-            <AbsDimension x="600" y="360"/>
+            <AbsDimension x="600" y="430"/>
         </Size>
         <Anchors>
             <Anchor point="CENTER"/>
@@ -1852,13 +1852,25 @@
                     </Anchors>
                 </FontString>
             </Layer>
+            <!-- Chain Heal Label (Downrank, Shaman only) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_Label_CH" inherits="GameFontHighlightSmall" text="Chain Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-180"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
             <!-- Minimum Rank Section Header -->
             <Layer level="ARTWORK">
                 <FontString name="QuickHealConfig_TextMinRank" inherits="GameFontNormal" text="Minimum Rank (if mana permits)">
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="32" y="-175"/>
+                                <AbsDimension x="32" y="-230"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -1870,7 +1882,7 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="57" y="-200"/>
+                                <AbsDimension x="57" y="-255"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -1882,7 +1894,19 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="57" y="-250"/>
+                                <AbsDimension x="57" y="-305"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Chain Heal Label (Minrank, Shaman only) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_Label_CH" inherits="GameFontHighlightSmall" text="Chain Heal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="57" y="-355"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -1917,7 +1941,7 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="500" y="-200"/>
+                                <AbsDimension x="500" y="-255"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -1928,7 +1952,30 @@
                     <Anchors>
                         <Anchor point="TOPLEFT">
                             <Offset>
-                                <AbsDimension x="500" y="-250"/>
+                                <AbsDimension x="500" y="-305"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <!-- Chain Heal rank display labels (Shaman only) -->
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealDownrank_RankNumberCH" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-195"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="QuickHealMinrank_RankNumberCH" outline="NORMAL" inherits="GameFontNormal" text="">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="500" y="-355"/>
                             </Offset>
                         </Anchor>
                     </Anchors>
@@ -1952,7 +1999,6 @@
                     <OnLoad>
                         this:SetMinMaxValues(1,12);
                         this:SetValueStep(1);
-                        this:SetValue(12)
                     </OnLoad>
                     <OnValueChanged>
                         QuickHealVariables["DownrankValueNH"] = this:GetValue();
@@ -1989,7 +2035,6 @@
                     <OnLoad>
                         this:SetMinMaxValues(1,7);
                         this:SetValueStep(1);
-                        this:SetValue(7)
                     </OnLoad>
                     <OnValueChanged>
                         QuickHealVariables["DownrankValueFH"] = this:GetValue();
@@ -2018,7 +2063,7 @@
                 <Anchors>
                     <Anchor point="TOPLEFT">
                         <Offset>
-                            <AbsDimension x="50" y="-215"/>
+                            <AbsDimension x="50" y="-270"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -2055,7 +2100,7 @@
                 <Anchors>
                     <Anchor point="TOPLEFT">
                         <Offset>
-                            <AbsDimension x="50" y="-265"/>
+                            <AbsDimension x="50" y="-320"/>
                         </Offset>
                     </Anchor>
                 </Anchors>
@@ -2075,6 +2120,80 @@
                     <OnEnter>
                         GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
                         GameTooltip:SetText(QuickHealMinrank_Label_FH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- Downrank Slider CH (Chain Heal, Shaman only) -->
+            <Slider name="QuickHealDownrank_Slider_CH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-195"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,3);
+                        this:SetValueStep(1);
+                        this:SetValue(3)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["DownrankValueCH"] = this:GetValue();
+                        QuickHealDownrank_RankNumberCH:SetText(QuickHealVariables["DownrankValueCH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["DownrankValueCH"] or 3);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealDownrank_Label_CH:GetText());
+                        this.tooltipShown = true;
+                    </OnEnter>
+                    <OnLeave>
+                        GameTooltip:Hide();
+                        this.tooltipShown = false;
+                    </OnLeave>
+                </Scripts>
+            </Slider>
+
+            <!-- Minrank Slider CH (Chain Heal, Shaman only) -->
+            <Slider name="QuickHealMinrank_Slider_CH" inherits="OptionsSliderTemplate">
+                <Size>
+                    <AbsDimension x="400" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT">
+                        <Offset>
+                            <AbsDimension x="50" y="-370"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetMinMaxValues(1,3);
+                        this:SetValueStep(1);
+                        this:SetValue(1)
+                    </OnLoad>
+                    <OnValueChanged>
+                        QuickHealVariables["MinrankValueCH"] = this:GetValue();
+                        QuickHealMinrank_RankNumberCH:SetText(QuickHealVariables["MinrankValueCH"]);
+                    </OnValueChanged>
+                    <OnShow>
+                        this:SetValue(QuickHealVariables["MinrankValueCH"] or 1);
+                    </OnShow>
+                    <OnEnter>
+                        GameTooltip:SetOwner(this,"ANCHOR_TOPLEFT");
+                        GameTooltip:SetText(QuickHealMinrank_Label_CH:GetText());
                         this.tooltipShown = true;
                     </OnEnter>
                     <OnLeave>

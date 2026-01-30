@@ -63,8 +63,12 @@ local DQHV = { -- Default values
     OverhealCancelThreshold = 50,
     MTList = {},
     SkipList = {},
-    MinrankValueNH = 1,                            -- Minimum rank for Normal Heal (HT/FH/etc)
-    MinrankValueFH = 1,                            -- Minimum rank for Fast Heal (RG/HL/etc)
+    MinrankValueNH = 1,                            -- Minimum rank for Normal Heal (HW/HT/etc)
+    MinrankValueFH = 1,                            -- Minimum rank for Fast Heal (LHW/RG/etc)
+    MinrankValueCH = 1,                            -- Minimum rank for Chain Heal (Shaman only)
+    DownrankValueNH = 12,                          -- Maximum rank for Normal Heal (default: 12 for max class ranks)
+    DownrankValueFH = 7,                           -- Maximum rank for Fast Heal (default: 7 for max class ranks)
+    DownrankValueCH = 3,                           -- Maximum rank for Chain Heal (Shaman only)
     PrecastAggro = false,                          -- Precast spells on aggro targets even when not meeting general healing threshold
     PrecastAggroPreference = "HIGHEST_MAX_HEALTH", -- Preference for aggro target selection: HIGHEST_MAX_HEALTH or LOWEST_MAX_HEALTH
     PreHOTAggro = false,                           -- Pre-HOT aggro targets even when not meeting general healing threshold
@@ -1121,14 +1125,16 @@ local function Initialise()
         FindHealSpellToUse = QuickHeal_Shaman_FindHealSpellToUse;
         FindHealSpellToUseNoTarget = QuickHeal_Shaman_FindHealSpellToUseNoTarget;
         GetRatioHealthyExplanation = QuickHeal_Shaman_GetRatioHealthyExplanation;
+
+        -- Note: Chain Heal sliders are in QuickHealConfig_RanksFrame (430px), not QuickHeal_DownrankSlider
+
+        -- Healing Wave / Lesser Healing Wave sliders
         QuickHealDownrank_Slider_NH:SetMinMaxValues(1, 10);
-        QuickHealDownrank_Slider_NH:SetValue(10);
+        QuickHealDownrank_Slider_NH:SetValue(QuickHealVariables.DownrankValueNH or 10);
         QuickHealDownrank_Slider_FH:SetMinMaxValues(1, 6);
-        QuickHealDownrank_Slider_FH:SetValue(6);
+        QuickHealDownrank_Slider_FH:SetValue(QuickHealVariables.DownrankValueFH or 6);
         QuickHealMinrank_Slider_NH:SetMinMaxValues(1, 10);
         QuickHealMinrank_Slider_NH:SetValue(QuickHealVariables.MinrankValueNH);
-        QuickHealMinrank_Slider_FH:SetMinMaxValues(1, 6);
-        QuickHealMinrank_Slider_FH:SetValue(QuickHealVariables.MinrankValueFH);
         QuickHealMinrank_Slider_FH:SetMinMaxValues(1, 6);
         QuickHealMinrank_Slider_FH:SetValue(QuickHealVariables.MinrankValueFH);
 
@@ -1136,6 +1142,22 @@ local function Initialise()
         QuickHealDownrank_Label_FH:SetText("Lesser HW");
         QuickHealMinrank_Label_NH:SetText("Healing Wave");
         QuickHealMinrank_Label_FH:SetText("Lesser HW");
+
+        -- Chain Heal sliders (Shaman-specific) - show and configure
+        if QuickHealDownrank_Slider_CH then
+            QuickHealDownrank_Slider_CH:Show();
+            QuickHealDownrank_Label_CH:Show();
+            QuickHealDownrank_RankNumberCH:Show();
+            QuickHealDownrank_Slider_CH:SetMinMaxValues(1, 3);
+            QuickHealDownrank_Slider_CH:SetValue(QuickHealVariables.DownrankValueCH or 3);
+        end
+        if QuickHealMinrank_Slider_CH then
+            QuickHealMinrank_Slider_CH:Show();
+            QuickHealMinrank_Label_CH:Show();
+            QuickHealMinrank_RankNumberCH:Show();
+            QuickHealMinrank_Slider_CH:SetMinMaxValues(1, 3);
+            QuickHealMinrank_Slider_CH:SetValue(QuickHealVariables.MinrankValueCH or 1);
+        end
 
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Shaman;
         SLASH_QUICKHEAL1 = "/qh";
@@ -1157,6 +1179,18 @@ local function Initialise()
         QuickHealDownrank_Label_FH:SetText("Flash Heal");
         QuickHealMinrank_Label_NH:SetText("Greater Heal");
         QuickHealMinrank_Label_FH:SetText("Flash Heal");
+
+        -- Hide Chain Heal sliders (Shaman only)
+        if QuickHealDownrank_Slider_CH then
+            QuickHealDownrank_Slider_CH:Hide();
+            QuickHealDownrank_Label_CH:Hide();
+            QuickHealDownrank_RankNumberCH:Hide();
+        end
+        if QuickHealMinrank_Slider_CH then
+            QuickHealMinrank_Slider_CH:Hide();
+            QuickHealMinrank_Label_CH:Hide();
+            QuickHealMinrank_RankNumberCH:Hide();
+        end
 
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Priest;
         SLASH_QUICKHEAL1 = "/qh";
@@ -1196,6 +1230,19 @@ local function Initialise()
 
         QuickHealDownrank_RankNumberBot:SetPoint("CENTER", QuickHeal_DownrankSlider, "TOP", 108, -108); -- Reset position if it was moved
         QuickHealMinrank_Slider_FH:SetValue(QuickHealVariables.MinrankValueFH);
+
+        -- Hide Chain Heal sliders (Shaman only)
+        if QuickHealDownrank_Slider_CH then
+            QuickHealDownrank_Slider_CH:Hide();
+            QuickHealDownrank_Label_CH:Hide();
+            QuickHealDownrank_RankNumberCH:Hide();
+        end
+        if QuickHealMinrank_Slider_CH then
+            QuickHealMinrank_Slider_CH:Hide();
+            QuickHealMinrank_Label_CH:Hide();
+            QuickHealMinrank_RankNumberCH:Hide();
+        end
+
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Paladin;
         SLASH_QUICKHEAL1 = "/qh";
         SLASH_QUICKHEAL2 = "/quickheal";
@@ -1221,6 +1268,18 @@ local function Initialise()
         QuickHealDownrank_Label_FH:SetText("Regrowth");
         QuickHealMinrank_Label_NH:SetText("Healing Touch");
         QuickHealMinrank_Label_FH:SetText("Regrowth");
+
+        -- Hide Chain Heal sliders (Shaman only)
+        if QuickHealDownrank_Slider_CH then
+            QuickHealDownrank_Slider_CH:Hide();
+            QuickHealDownrank_Label_CH:Hide();
+            QuickHealDownrank_RankNumberCH:Hide();
+        end
+        if QuickHealMinrank_Slider_CH then
+            QuickHealMinrank_Slider_CH:Hide();
+            QuickHealMinrank_Label_CH:Hide();
+            QuickHealMinrank_RankNumberCH:Hide();
+        end
 
         SlashCmdList["QUICKHEAL"] = QuickHeal_Command_Druid;
         SLASH_QUICKHEAL1 = "/qh";
@@ -3898,9 +3957,17 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
 end
 
 function ToggleDownrankWindow()
-    QuickHeal_ToggleConfigurationPanel();
+    if not QuickHealConfig:IsVisible() then
+        QuickHealConfig:Show();
+    end
+    -- Hide all tab frames
+    QuickHealConfig_GeneralOptionsFrame:Hide();
+    QuickHealConfig_HealingTargetFilterFrame:Hide();
+    QuickHealConfig_MessagesAndNotificationFrame:Hide();
+    -- Show Ranks frame
+    QuickHealConfig_RanksFrame:Show();
+    -- Set tab selection
     PanelTemplates_SetTab(QuickHealConfig, 4);
-    QuickHealConfigTab4:Click();
 end
 
 ------------------------------------------------------------------------------------------------------------------------
