@@ -1525,7 +1525,7 @@ UpdateQuickHealOverhealStatus = function(multiplier)
     end
 end
 
-local function StartMonitor(Target, multiplier)
+function StartMonitor(Target, multiplier)
     MassiveOverhealInProgress = false;
     HealingTarget = Target;
 
@@ -2432,7 +2432,7 @@ local function _CastSpell(spellID, spellbookType)
     end
 end
 
-local function CastCheckSpell()
+function CastCheckSpell()
     local _, class = UnitClass('player');
     class = string.lower(class);
     if class == "druid" then
@@ -2452,7 +2452,7 @@ local function CastCheckSpell()
     end
 end
 
-local function CastCheckSpellHOT()
+function CastCheckSpellHOT()
     local _, class = UnitClass('player');
     class = string.lower(class);
 
