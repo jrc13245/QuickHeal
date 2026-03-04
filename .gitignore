@@ -1,8 +1,10 @@
-﻿.idea/workspace.xml
-.idea
-CLAUDE.md
 wow-api-type-definitions/
-superwow_wiki.txt
-nampower_wiki.txt
-unitxp_sp3_wiki.txt
-bestoriop-quickheal/
+.luarc.json
+.gitignore
+CLAUDE.md
+AddonsForCompatibility/
+Nampower_Wiki/
+SuperWoW_Wiki.txt
+UnitXP_SP3_Wiki.txt
+.claude/
+TWoW_Wiki.txt

@@ -78,10 +78,39 @@ end
 local function CheckDruidBuffs(inCombat, manaLeft, healneed, mods)
     local forceHTinCombat = false
 
+    -- Nampower: use aura spell ID array for reliable detection
+    if GetUnitField then
+        local success, auras = pcall(GetUnitField, "player", "aura")
+        if success and auras then
+            for i = 1, 31 do -- slots 1-31 are buffs
+                local spellId = auras[i]
+                if spellId and spellId > 0 and GetSpellNameAndRankForId then
+                    local name = GetSpellNameAndRankForId(spellId)
+                    if name == "Clearcasting" then
+                        QuickHeal_debug("BUFF: Clearcasting [" .. spellId .. "] (Omen of Clarity)")
+                        manaLeft = QH_GetUnitMaxMana('player')
+                        healneed = 10 ^ 6
+                    elseif name == "Nature's Swiftness" then
+                        QuickHeal_debug("BUFF: Nature's Swiftness [" .. spellId .. "] (HT forced)")
+                        forceHTinCombat = true
+                    elseif name == "Hand of Edward the Odd" then
+                        QuickHeal_debug("BUFF: Hand of Edward the Odd [" .. spellId .. "] (out of combat healing forced)")
+                        inCombat = false
+                    elseif name == "Wushoolay's Charm of Nature" or name == "Wushoolay Charm" then
+                        QuickHeal_debug("BUFF: Wushoolay [" .. spellId .. "] (healing touch forced)")
+                        forceHTinCombat = true
+                    end
+                end
+            end
+            return inCombat, manaLeft, healneed, forceHTinCombat
+        end
+    end
+
+    -- Fallback: texture-based detection (when Nampower is not available)
     -- Detect Clearcasting (from Omen of Clarity)
     if QuickHeal_DetectBuff('player', "Spell_Shadow_ManaBurn", 1) then
         QuickHeal_debug("BUFF: Clearcasting (Omen of Clarity)")
-        manaLeft = UnitManaMax('player')
+        manaLeft = QH_GetUnitMaxMana('player')
         healneed = 10 ^ 6
     end
 
@@ -125,11 +154,11 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
     local healneed, Health, HDB
     if target then
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
         incombat = UnitAffectingCombat('player') or UnitAffectingCombat(target)
@@ -156,7 +185,7 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
 
     -- Get modifiers
     local mods = GetDruidModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Check buffs
     local forceHTinCombat
@@ -200,8 +229,10 @@ function QuickHeal_Druid_FindHealSpellToUse(target, healType, multiplier, forceM
         debug("Target is healthy", Health)
     end
 
-    -- Use Healing Touch when target is healthy, Regrowth unavailable, or forceHTinCombat
-    if TargetIsHealthy or maxRankRG < 1 or forceHTinCombat or (not target and not forceMaxHPS) then
+    -- Use Healing Touch when forced via healType, target is healthy, Regrowth unavailable, or forceHTinCombat
+    local useHT = (healType == "ht") or
+        (healType ~= "rg" and (TargetIsHealthy or maxRankRG < 1 or forceHTinCombat or (not target and not forceMaxHPS)))
+    if useHT then
         debug("Using Healing Touch")
         if Health < RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
             SpellID = SpellIDsHT[1]; HealSize = (44 + healMod15 * PF[1]) * gonMod
@@ -290,11 +321,11 @@ function QuickHeal_Druid_FindHoTSpellToUse(target, healType, forceMaxRank, maxhe
     local healneed, Health, HDB
     if target then
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
         incombat = UnitAffectingCombat('player') or UnitAffectingCombat(target)
@@ -316,12 +347,12 @@ function QuickHeal_Druid_FindHoTSpellToUse(target, healType, forceMaxRank, maxhe
 
     -- Get modifiers
     local mods = GetDruidModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Detect Clearcasting (from Omen of Clarity)
     if QuickHeal_DetectBuff('player', "Spell_Shadow_ManaBurn", 1) then
         debug("BUFF: Clearcasting (Omen of Clarity)")
-        ManaLeft = UnitManaMax('player')
+        ManaLeft = QH_GetUnitMaxMana('player')
         healneed = 10 ^ 6
     end
 
@@ -492,6 +523,14 @@ function QuickHeal_Command_Druid(msg)
                 QuickHeal(arg4, nil, nil, false)
                 return
             end
+            if arg5 == "ht" then
+                QuickHeal(arg4, nil, {healType = "ht"})
+                return
+            end
+            if arg5 == "rg" then
+                QuickHeal(arg4, nil, {healType = "rg"})
+                return
+            end
         end
     end
 
@@ -529,6 +568,14 @@ function QuickHeal_Command_Druid(msg)
         QuickHeal()
         return
     end
+    if cmd == "ht" then
+        QuickHeal(nil, nil, {healType = "ht"})
+        return
+    end
+    if cmd == "rg" then
+        QuickHeal(nil, nil, {healType = "rg"})
+        return
+    end
     if cmd == "hot" then
         QuickHOT()
         return
@@ -554,6 +601,6 @@ function QuickHeal_Command_Druid(msg)
     writeLine("/qh reset - Reset configuration to default parameters.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")
     writeLine(" [mask]: player, target, targettarget, party, mt, nonmt, subgroup")
-    writeLine(" [type]: heal (Healing Touch), hot (Rejuvenation)")
+    writeLine(" [type]: heal (auto), ht (force Healing Touch), rg (force Regrowth), hot (Rejuvenation)")
     writeLine(" [mod]: max (max rank), fh (firehose - max rank, no hp check)")
 end

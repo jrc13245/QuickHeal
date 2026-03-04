@@ -61,6 +61,28 @@ end
 -- Check for Shaman-specific buffs that affect healing
 -- Returns: inCombat (adjusted)
 local function CheckShamanBuffs(inCombat)
+    -- Nampower: use aura spell ID array for reliable detection
+    if GetUnitField then
+        local success, auras = pcall(GetUnitField, "player", "aura")
+        if success and auras then
+            for i = 1, 31 do -- slots 1-31 are buffs
+                local spellId = auras[i]
+                if spellId and spellId > 0 and GetSpellNameAndRankForId then
+                    local name = GetSpellNameAndRankForId(spellId)
+                    if name == "Nature's Swiftness" then
+                        QuickHeal_debug("BUFF: Nature's Swiftness [" .. spellId .. "] (out of combat healing forced)")
+                        inCombat = false
+                    elseif name == "Hand of Edward the Odd" then
+                        QuickHeal_debug("BUFF: Hand of Edward the Odd [" .. spellId .. "] (out of combat healing forced)")
+                        inCombat = false
+                    end
+                end
+            end
+            return inCombat
+        end
+    end
+
+    -- Fallback: texture-based detection (when Nampower is not available)
     -- Detect Nature's Swiftness (next nature spell is instant cast)
     if QuickHeal_DetectBuff('player', "Spell_Nature_RavenForm") then
         QuickHeal_debug("BUFF: Nature's Swiftness (out of combat healing forced)")
@@ -104,11 +126,11 @@ function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, 
     local healneed, Health, HDB, hwMod
     if target then
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
         hwMod = GetHealingWayMod(target)
@@ -126,7 +148,7 @@ function QuickHeal_Shaman_FindChainHealSpellToUse(target, healType, multiplier, 
 
     -- Get modifiers
     local mods = GetShamanModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Get Chain Heal spell IDs
     local SpellIDsCH = QuickHeal_GetSpellIDs(QUICKHEAL_SPELL_CHAIN_HEAL)
@@ -197,11 +219,11 @@ function QuickHeal_Shaman_FindHealSpellToUse(target, healType, multiplier, force
     local healneed, Health, HDB, hwMod
     if target then
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
         incombat = UnitAffectingCombat('player') or UnitAffectingCombat(target)
@@ -230,7 +252,7 @@ function QuickHeal_Shaman_FindHealSpellToUse(target, healType, multiplier, force
 
     -- Get modifiers
     local mods = GetShamanModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Check buffs
     incombat = CheckShamanBuffs(incombat)

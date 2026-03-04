@@ -57,23 +57,55 @@ local function GetPaladinModifiers()
     return mods
 end
 
+-- Holy Judgement buff spell IDs (one per talent rank)
+local HOLY_JUDGEMENT_BUFF_IDS = {
+    [51305] = true, -- Rank 1
+    [51307] = true, -- Rank 2
+    [51309] = true, -- Rank 3
+}
+
 -- Check for Paladin-specific buffs that affect healing
 -- Returns: forceHL flag
 local function CheckPaladinBuffs()
     local forceHL = false
 
-    -- Detect Hand of Edward the Odd (next spell is instant cast)
-    -- Note: Must check for exact match to avoid false positive with "Protective Light"
-    -- which uses icon "Spell_Holy_SearingLightPriest"
-    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") and
-       not QuickHeal_DetectBuff('player', "Spell_Holy_SearingLightPriest") then
-        QuickHeal_debug("BUFF: Hand of Edward the Odd (out of combat healing forced)")
-        forceHL = true
+    -- Nampower: use aura spell ID array for reliable detection (no false positives)
+    if GetUnitField then
+        local success, auras = pcall(GetUnitField, "player", "aura")
+        if success and auras then
+            for i = 1, 31 do -- slots 1-31 are buffs
+                local spellId = auras[i]
+                if spellId and spellId > 0 then
+                    -- Direct spell ID match for Holy Judgement
+                    if HOLY_JUDGEMENT_BUFF_IDS[spellId] then
+                        QuickHeal_debug("BUFF: Holy Judgement [" .. spellId .. "] (HL forced)")
+                        forceHL = true
+                        break
+                    end
+                    -- Name-based match for Hand of Edward the Odd
+                    if GetSpellNameAndRankForId then
+                        local name = GetSpellNameAndRankForId(spellId)
+                        if name == "Hand of Edward the Odd" then
+                            QuickHeal_debug("BUFF: Hand of Edward the Odd [" .. spellId .. "] (HL forced)")
+                            forceHL = true
+                            break
+                        end
+                    end
+                end
+            end
+            return forceHL
+        end
     end
 
-    -- Detect Holy Judgement (next Holy Light is fast cast)
-    if QuickHeal_DetectBuff('player', "ability_paladin_judgementblue") then
-        QuickHeal_debug("BUFF: Holy Judgement (out of combat healing forced)")
+    -- Fallback: texture-based detection (when Nampower is not available)
+    -- Use $ anchor for exact texture end-match to reduce false positives
+    if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight$") and
+       not QuickHeal_DetectBuff('player', "Spell_Holy_SearingLightPriest") then
+        QuickHeal_debug("BUFF: Hand of Edward the Odd (HL forced)")
+        forceHL = true
+    end
+    if QuickHeal_DetectBuff('player', "ability_paladin_judgementblue$") then
+        QuickHeal_debug("BUFF: Holy Judgement (HL forced)")
         forceHL = true
     end
 
@@ -96,18 +128,18 @@ function QuickHeal_Paladin_FindSpellToUse(target, healType, multiplier, forceMax
     -- Get health info
     local healneed, Health, HDB
     if target then
-        if QuickHeal_UnitHasHealthInfo(target) and UnitHealthMax(target) > 0 then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
+        if QuickHeal_UnitHasHealthInfo(target) and QH_GetUnitMaxHealth(target) > 0 then
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
             if multiplier > 1.0 then
                 healneed = healneed * multiplier
             end
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
             if multiplier > 1.0 then
                 healneed = healneed * multiplier
             end
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
         incombat = UnitAffectingCombat('player') or UnitAffectingCombat(target)
@@ -134,7 +166,7 @@ function QuickHeal_Paladin_FindSpellToUse(target, healType, multiplier, forceMax
 
     -- Get modifiers
     local mods = GetPaladinModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Check buffs
     local ForceHL = CheckPaladinBuffs()
@@ -278,11 +310,11 @@ function QuickHeal_Paladin_FindHoTSpellToUse(target, healType, forceMaxRank, max
     local healneed, Health, HDB
     if target then
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target)
-            Health = UnitHealth(target) / UnitHealthMax(target)
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target)
+            Health = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target)
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true)
-            Health = UnitHealth(target) / 100
+            Health = QH_GetUnitHealth(target) / 100
         end
         HDB = QuickHeal_GetHealModifier(target)
     else
@@ -304,13 +336,22 @@ function QuickHeal_Paladin_FindHoTSpellToUse(target, healType, forceMaxRank, max
 
     -- Get modifiers
     local mods = GetPaladinModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Get Holy Shock spell IDs
     local SpellIDsHS = QuickHeal_GetSpellIDs(QUICKHEAL_SPELL_HOLY_SHOCK)
     local maxRankHS = table.getn(SpellIDsHS)
 
     debug(string.format("Found HS up to rank %d", maxRankHS))
+
+    -- Check if Holy Shock is on cooldown (Nampower)
+    if maxRankHS >= 1 and GetSpellIdForName then
+        local ok, dbcId = pcall(GetSpellIdForName, QUICKHEAL_SPELL_HOLY_SHOCK)
+        if ok and dbcId and QH_IsSpellOnCooldown(dbcId) then
+            debug("Holy Shock is on cooldown, skipping")
+            return nil, 0
+        end
+    end
 
     local hlMod = mods.hlMod
     local dfMod = mods.dfMod
@@ -547,7 +588,7 @@ function GetPlayersBelowHealthThresholdInRange(minHPf)
         for i = 1, GetNumRaidMembers() do
             local unit = "raid" .. i
             if IsHealable(unit) and IsWithin10Yards(unit) then
-                local healthPercent = (UnitHealth(unit) / UnitHealthMax(unit)) * 100
+                local healthPercent = (QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit)) * 100
                 if healthPercent <= minHPf then
                     count = count + 1
                 end
@@ -562,7 +603,7 @@ function GetPlayersBelowHealthThresholdInRange(minHPf)
         end
         for _, unit in ipairs(units) do
             if IsHealable(unit) and IsWithin10Yards(unit) then
-                local healthPercent = (UnitHealth(unit) / UnitHealthMax(unit)) * 100
+                local healthPercent = (QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit)) * 100
                 if healthPercent <= minHPf then
                     count = count + 1
                 end
@@ -580,7 +621,7 @@ function GetLowestHealthUnit()
         for i = 1, GetNumRaidMembers() do
             local unit = "raid" .. i
             if IsHealable(unit) and CheckInteractDistance(unit, 4) then
-                local healthPct = (UnitHealth(unit) / UnitHealthMax(unit)) * 100
+                local healthPct = (QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit)) * 100
                 if healthPct < lowestHealthPct then
                     lowestUnit = unit
                     lowestHealthPct = healthPct
@@ -596,7 +637,7 @@ function GetLowestHealthUnit()
         end
         for _, unit in ipairs(units) do
             if IsHealable(unit) and CheckInteractDistance(unit, 4) then
-                local healthPct = ((UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) / UnitHealthMax(unit)) * 100
+                local healthPct = ((QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) / QH_GetUnitMaxHealth(unit)) * 100
                 if healthPct < lowestHealthPct then
                     lowestUnit = unit
                     lowestHealthPct = healthPct

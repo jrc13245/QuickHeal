@@ -103,7 +103,7 @@ local function QH_InLineOfSight(unit1, unit2)
     return true -- Assume LOS if no DLL (optimistic)
 end
 
-local function QH_IsSpellInRange(spellNameOrId, target)
+function QH_IsSpellInRange(spellNameOrId, target)
     if has_nampower and IsSpellInRange then
         local success, result = pcall(IsSpellInRange, spellNameOrId, target)
         if success then return result end
@@ -111,7 +111,7 @@ local function QH_IsSpellInRange(spellNameOrId, target)
     return 1 -- Assume in range if no DLL (optimistic)
 end
 
-local function QH_GetUnitHealth(unit)
+function QH_GetUnitHealth(unit)
     if has_nampower and GetUnitField then
         local success, health = pcall(GetUnitField, unit, "health")
         if success and health then return health end
@@ -119,7 +119,7 @@ local function QH_GetUnitHealth(unit)
     return UnitHealth(unit)
 end
 
-local function QH_GetUnitMaxHealth(unit)
+function QH_GetUnitMaxHealth(unit)
     if has_nampower and GetUnitField then
         local success, maxHealth = pcall(GetUnitField, unit, "maxHealth")
         if success and maxHealth then return maxHealth end
@@ -127,7 +127,7 @@ local function QH_GetUnitMaxHealth(unit)
     return UnitHealthMax(unit)
 end
 
-local function QH_GetUnitMana(unit)
+function QH_GetUnitMana(unit)
     if has_nampower and GetUnitField then
         local success, mana = pcall(GetUnitField, unit, "power1")
         if success and mana then return mana end
@@ -135,7 +135,7 @@ local function QH_GetUnitMana(unit)
     return UnitMana(unit)
 end
 
-local function QH_GetUnitMaxMana(unit)
+function QH_GetUnitMaxMana(unit)
     if has_nampower and GetUnitField then
         local success, maxMana = pcall(GetUnitField, unit, "maxPower1")
         if success and maxMana then return maxMana end
@@ -216,6 +216,69 @@ local function QH_IsHealSpellInRange(spellID, target)
         end
     end
     return true -- Assume in range if we can't check
+end
+
+-- Get mana cost and cast time for a spell by name (max rank only) using Nampower
+function QH_GetSpellRecInfo(spellName)
+    if not (has_nampower and GetSpellIdForName and GetSpellRecField) then return nil end
+    local ok, dbcId = pcall(GetSpellIdForName, spellName)
+    if not ok or not dbcId then return nil end
+    local info = {}
+    local ok2, manaCost = pcall(GetSpellRecField, dbcId, "manaCost")
+    if ok2 and manaCost then info.manaCost = manaCost end
+    local ok3, castTime = pcall(GetSpellRecField, dbcId, "castTime")
+    if ok3 and castTime then info.castTime = castTime / 1000 end
+    return info, dbcId
+end
+
+-- Check if a spell (by DBC ID) is on individual cooldown
+function QH_IsSpellOnCooldown(dbcSpellId)
+    if not (has_nampower and GetSpellIdCooldown) then return false end
+    local ok, cd = pcall(GetSpellIdCooldown, dbcSpellId)
+    if ok and cd and cd.isOnIndividualCooldown == 1 then return true end
+    return false
+end
+
+-- Get remaining buff duration for a player aura slot
+function QH_GetPlayerBuffDuration(auraSlot)
+    if not (has_nampower and GetPlayerAuraDuration) then return nil end
+    local ok, spellId, remainMs, expireMs = pcall(GetPlayerAuraDuration, auraSlot)
+    if ok and spellId and spellId > 0 then
+        return spellId, remainMs, expireMs
+    end
+    return nil
+end
+
+-- Get the mana cost modifier for a spell (modifier type 14 = COST)
+function QH_GetManaCostModifier(dbcSpellId)
+    if not (has_nampower and GetSpellModifiers) then return 0, 0 end
+    local ok, flat, pct = pcall(GetSpellModifiers, dbcSpellId, 14)
+    if ok then return flat or 0, pct or 0 end
+    return 0, 0
+end
+
+-- Get the healing/damage modifier for a spell (modifier type 0 = DAMAGE)
+function QH_GetHealModifierFromTalents(dbcSpellId)
+    if not (has_nampower and GetSpellModifiers) then return 0, 0 end
+    local ok, flat, pct = pcall(GetSpellModifiers, dbcSpellId, 0)
+    if ok then return flat or 0, pct or 0 end
+    return 0, 0
+end
+
+-- Get the DBC duration of a spell (e.g. HoT duration)
+function QH_GetSpellDuration(dbcSpellId)
+    if not (has_nampower and GetSpellDuration) then return nil end
+    local ok, duration = pcall(GetSpellDuration, dbcSpellId)
+    if ok and duration and duration > 0 then return duration end
+    return nil
+end
+
+-- Check if a spell is usable (mana, form requirements, etc.)
+function QH_IsSpellUsable(spellNameOrId)
+    if not (has_nampower and IsSpellUsable) then return true end -- assume usable if can't check
+    local ok, usable = pcall(IsSpellUsable, spellNameOrId)
+    if ok then return usable == 1 end
+    return true
 end
 
 -- Global function to report DLL status (can be called from /qh dll)
@@ -317,11 +380,23 @@ end
 -- Cached equipment healing bonus lookup
 function QuickHeal_GetEquipmentBonus()
     if EquipmentBonusCache == nil then
-        if AceLibrary and AceLibrary:HasInstance("ItemBonusLib-1.0") then
-            local itemBonus = AceLibrary("ItemBonusLib-1.0");
-            EquipmentBonusCache = itemBonus:GetBonus("HEAL") or 0;
-        else
-            EquipmentBonusCache = 0;
+        -- Nampower: GetSpellPower returns (physical, holy, fire, nature, frost, shadow, arcane)
+        -- Holy school (index 2) includes healing bonus
+        if has_nampower and GetSpellPower then
+            local success, results = pcall(GetSpellPower)
+            if success and results then
+                local _, holy = GetSpellPower()
+                EquipmentBonusCache = holy or 0
+            end
+        end
+        -- Fallback to ItemBonusLib
+        if EquipmentBonusCache == nil then
+            if AceLibrary and AceLibrary:HasInstance("ItemBonusLib-1.0") then
+                local itemBonus = AceLibrary("ItemBonusLib-1.0");
+                EquipmentBonusCache = itemBonus:GetBonus("HEAL") or 0;
+            else
+                EquipmentBonusCache = 0;
+            end
         end
     end
     return EquipmentBonusCache;
@@ -361,11 +436,11 @@ function QuickHeal_GetTargetHealth(target, maxhealth, healDeficit, multiplier, h
     if target then
         -- Get health from target unit
         if QuickHeal_UnitHasHealthInfo(target) then
-            healneed = UnitHealthMax(target) - UnitHealth(target);
-            healthPercent = UnitHealth(target) / UnitHealthMax(target);
+            healneed = QH_GetUnitMaxHealth(target) - QH_GetUnitHealth(target);
+            healthPercent = QH_GetUnitHealth(target) / QH_GetUnitMaxHealth(target);
         else
             healneed = QuickHeal_EstimateUnitHealNeed(target, true);
-            healthPercent = UnitHealth(target) / 100;
+            healthPercent = QH_GetUnitHealth(target) / 100;
         end
         healDebuffMod = QuickHeal_GetHealModifier(target);
     else
@@ -1458,8 +1533,8 @@ UpdateQuickHealOverhealStatus = function(multiplier)
         end
 
         -- Account for incoming heals in healneed calculation
-        local currentHealth = UnitHealth(HealingTarget) + incomingHeal;
-        local maxHealth = UnitHealthMax(HealingTarget);
+        local currentHealth = QH_GetUnitHealth(HealingTarget) + incomingHeal;
+        local maxHealth = QH_GetUnitMaxHealth(HealingTarget);
         healneed = maxHealth - currentHealth;
         if healneed < 0 then healneed = 0; end
         healthpercentage = currentHealth / maxHealth;
@@ -1470,7 +1545,7 @@ UpdateQuickHealOverhealStatus = function(multiplier)
         -- Reduce healneed by incoming heals (estimate based on percentage)
         healneed = healneed - incomingHeal;
         if healneed < 0 then healneed = 0; end
-        healthpercentage = UnitHealth(HealingTarget) / 100;
+        healthpercentage = QH_GetUnitHealth(HealingTarget) / 100;
         healthpercentagepost = healthpercentage + HealingSpellSize * (1 - healthpercentage) / (healneed > 0 and healneed or 1);
     end
 
@@ -1537,6 +1612,11 @@ function StartMonitor(Target, multiplier)
 
 
     QuickHeal_debug("*Starting Monitor", UnitFullName(Target));
+    -- Nampower: use GUID-based health events for precise tracking
+    if has_nampower and GetUnitField then
+        pcall(SetCVar, "NP_EnableUnitEventsGuid", "1")
+        QuickHealConfig:RegisterEvent("UNIT_HEALTH_GUID")
+    end
     QuickHealConfig:RegisterEvent("UNIT_HEALTH");           -- For detecting overheal situations
     QuickHealConfig:RegisterEvent("SPELLCAST_STOP");        -- For detecting spellcast stop
     QuickHealConfig:RegisterEvent("SPELLCAST_FAILED");      -- For detecting spellcast stop
@@ -1562,6 +1642,9 @@ StopMonitor = function(trigger)
     QuickHealOverhealStatusScreenCenter:Hide();
     QuickHealHealingBar:Hide()
     QuickHealConfig:UnregisterEvent("UNIT_HEALTH");
+    if has_nampower then
+        pcall(QuickHealConfig.UnregisterEvent, QuickHealConfig, "UNIT_HEALTH_GUID")
+    end
     QuickHealConfig:UnregisterEvent("SPELLCAST_STOP");
     QuickHealConfig:UnregisterEvent("SPELLCAST_FAILED");
     QuickHealConfig:UnregisterEvent("SPELLCAST_INTERRUPTED");
@@ -1639,6 +1722,33 @@ function QuickHeal_OnEvent()
                     SpellStopCasting()
                     StopMonitor("Heal no longer needed")
                     return
+                end
+            end
+        end
+    elseif event == "UNIT_HEALTH_GUID" then
+        -- Nampower GUID-based health event: arg1 = GUID of unit whose health changed
+        if HealingTarget and has_nampower and GetUnitField then
+            local ok, targetGuid = pcall(GetUnitField, HealingTarget, "guid")
+            if ok and targetGuid and arg1 == targetGuid then
+                UpdateQuickHealOverhealStatus()
+                if QHV.StopcastEnabled then
+                    if UnitIsDeadOrGhost(HealingTarget) then
+                        SpellStopCasting()
+                        StopMonitor("Target died")
+                        return
+                    end
+                    local healthPct
+                    if QuickHeal_UnitHasHealthInfo(HealingTarget) then
+                        local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
+                        healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+                    else
+                        healthPct = QH_GetUnitHealth(HealingTarget) / 100
+                    end
+                    if healthPct >= QHV.RatioFull then
+                        SpellStopCasting()
+                        StopMonitor("Heal no longer needed")
+                        return
+                    end
                 end
             end
         end
@@ -2085,9 +2195,80 @@ local HealingDebuffs = {
     Ability_Creature_Poison_03 = 0.9   -- Necrotic Poison (app unconfirmed)
 }
 
+-- Spell-ID-based healing modifier tables for Nampower aura detection
+-- Self buffs (on player) that increase healing done to others
+local SelfHealingBuffSpellIDs = {
+    [10060] = 0.2,  -- Power Infusion (Priest Talent)
+}
+-- Debuffs (on target) that reduce healing received
+-- value = reduction fraction (0.5 = 50% reduction), true = read from tooltip
+local HealingDebuffSpellIDs = {
+    -- Mortal Strike (Warrior) - 50% reduction
+    [12294] = 0.5, [21551] = 0.5, [21552] = 0.5, [21553] = 0.5,
+    -- Mortal Cleave
+    [22859] = 0.5,
+    -- Wound Poison
+    [13218] = true, [13222] = true, [13223] = true, [13224] = true,
+    -- Hex of Weakness
+    [12480] = 0.2, [12483] = 0.2, [12484] = 0.2,
+    -- Blood Fury (Orc Racial)
+    [23230] = 0.25,
+    -- Necrotic Poison (Naxx)
+    [28622] = 0.9,
+    -- Mortal Wound (various mobs)
+    [25646] = 0.5,
+    -- Gehenna's Curse
+    [19716] = true,
+    -- Curse of the Deadwood
+    [17771] = true,
+    -- Veil of Shadow
+    [22687] = true,
+    -- Brood Affliction: Green
+    [23169] = 0.5,
+}
+
 -- Returns the modifier to healing (as a factor) caused by buffs and debuffs
 function QuickHeal_GetHealModifier(unit)
-    local HealModifier = 1;
+    local HealModifier = 1
+
+    -- Nampower path: use aura spell IDs for precise detection
+    if has_nampower and GetUnitField then
+        local ok, selfAuras = pcall(GetUnitField, "player", "aura")
+        local ok2, targetAuras = pcall(GetUnitField, unit, "aura")
+
+        if ok and selfAuras then
+            -- Self buffs (slots 1-32)
+            for slot = 1, 32 do
+                local spellId = selfAuras[slot]
+                if spellId and spellId > 0 then
+                    local mod = SelfHealingBuffSpellIDs[spellId]
+                    if mod and type(mod) == "number" then
+                        HealModifier = HealModifier * (1 + mod)
+                    end
+                end
+            end
+        end
+
+        if ok2 and targetAuras then
+            -- Target debuffs (slots 33-48 are debuff slots in the aura array)
+            for slot = 33, 48 do
+                local spellId = targetAuras[slot]
+                if spellId and spellId > 0 then
+                    local mod = HealingDebuffSpellIDs[spellId]
+                    if mod then
+                        if type(mod) == "number" then
+                            HealModifier = HealModifier * (1 - mod)
+                        end
+                        -- type(mod) == "boolean": unknown percentage, fall through
+                        -- to texture scan below for this specific debuff
+                    end
+                end
+            end
+            return HealModifier
+        end
+    end
+
+    -- Fallback: texture-based scanning (when Nampower is unavailable)
     for i = 1, 16 do
         -- Buffs on player that affects the amount healed to others
         local modifier = ModifierScan('player', i, SelfHealingBuffs, false);
@@ -2293,6 +2474,15 @@ function QuickHeal_GetSpellIDs(spellName)
             end
         end
         return cached;
+    end
+
+    -- Nampower: early exit if spell isn't in spellbook at all
+    if has_nampower and GetSpellIdForName then
+        local success, id = pcall(GetSpellIdForName, spellName)
+        if success and not id then
+            SpellCache[spellName] = {};
+            return {};
+        end
     end
 
     local i = 1;
@@ -2692,24 +2882,24 @@ local function FindWhoToHeal(Restrict, extParam)
                             -- Found an aggro target, select based on preference
                             if not healingTarget then
                                 healingTarget = unit;
-                                healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                    UnitHealthMax(unit);
+                                healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                    QH_GetUnitMaxHealth(unit);
                             else
                                 -- Compare based on preference
-                                local currentMaxHealth = UnitHealthMax(healingTarget);
-                                local candidateMaxHealth = UnitHealthMax(unit);
+                                local currentMaxHealth = QH_GetUnitMaxHealth(healingTarget);
+                                local candidateMaxHealth = QH_GetUnitMaxHealth(unit);
 
                                 if QHV.PrecastAggroPreference == "LOWEST_MAX_HEALTH" then
                                     if candidateMaxHealth < currentMaxHealth then
                                         healingTarget = unit;
-                                        healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                            UnitHealthMax(unit);
+                                        healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                            QH_GetUnitMaxHealth(unit);
                                     end
                                 else -- HIGHEST_MAX_HEALTH
                                     if candidateMaxHealth > currentMaxHealth then
                                         healingTarget = unit;
-                                        healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                            UnitHealthMax(unit);
+                                        healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                            QH_GetUnitMaxHealth(unit);
                                     end
                                 end
                             end
@@ -2734,10 +2924,10 @@ local function FindWhoToHeal(Restrict, extParam)
     -- Examine External Target (only if still no target found)
     if not healingTarget and AllPlayersAreFull and (AllPetsAreFull or QHV.PetPriority == 0) then
         if not QuickHeal_UnitHasHealthInfo('target') and UnitIsHealable('target', true) then
-            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName('target'), 'target', UnitHealth('target'),
-                UnitHealthMax('target')));
+            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName('target'), 'target', QH_GetUnitHealth('target'),
+                QH_GetUnitMaxHealth('target')));
             local Health;
-            Health = UnitHealth('target') / 100;
+            Health = QH_GetUnitHealth('target') / 100;
             if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
@@ -3010,24 +3200,24 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
                                     healingTarget = unit;
                                     -- Set HealthPct to allow selection logic to proceed if needed,
                                     -- though typically we just return or set the target here.
-                                    healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                        UnitHealthMax(unit);
+                                    healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                        QH_GetUnitMaxHealth(unit);
                                 else
                                     -- Preference logic
-                                    local currentMaxHealth = UnitHealthMax(healingTarget);
-                                    local candidateMaxHealth = UnitHealthMax(unit);
+                                    local currentMaxHealth = QH_GetUnitMaxHealth(healingTarget);
+                                    local candidateMaxHealth = QH_GetUnitMaxHealth(unit);
 
                                     if QHV.PreHOTAggroPreference == "LOWEST_MAX_HEALTH" then
                                         if candidateMaxHealth < currentMaxHealth then
                                             healingTarget = unit;
-                                            healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                                UnitHealthMax(unit);
+                                            healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                                QH_GetUnitMaxHealth(unit);
                                         end
                                     else -- HIGHEST_MAX_HEALTH (default)
                                         if candidateMaxHealth > currentMaxHealth then
                                             healingTarget = unit;
-                                            healingTargetHealthPct = (UnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
-                                                UnitHealthMax(unit);
+                                            healingTargetHealthPct = (QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) /
+                                                QH_GetUnitMaxHealth(unit);
                                         end
                                     end
                                 end
@@ -3085,10 +3275,10 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
     -- Examine External Target
     if AllPlayersAreFull and (AllPetsAreFull or QHV.PetPriority == 0) then
         if not QuickHeal_UnitHasHealthInfo('target') and UnitIsHealable('target', true) then
-            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName('target'), 'target', UnitHealth('target'),
-                UnitHealthMax('target')));
+            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName('target'), 'target', QH_GetUnitHealth('target'),
+                QH_GetUnitMaxHealth('target')));
             local Health;
-            Health = UnitHealth('target') / 100;
+            Health = QH_GetUnitHealth('target') / 100;
             if Health < QHV.RatioFull or QHV.TestMode then
                 return 'target';
             end
@@ -3481,13 +3671,13 @@ function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
         -- Target is specified, check it
         QuickHeal_debug("********** Heal " .. Target .. " **********");
         if UnitIsHealable(Target, true) then
-            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(Target), Target, UnitHealth(Target),
-                UnitHealthMax(Target)));
+            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(Target), Target, QH_GetUnitHealth(Target),
+                QH_GetUnitMaxHealth(Target)));
             local targetPercentage;
             if QuickHeal_UnitHasHealthInfo(Target) then
-                targetPercentage = (UnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / UnitHealthMax(Target);
+                targetPercentage = (QH_GetUnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / QH_GetUnitMaxHealth(Target);
             else
-                targetPercentage = UnitHealth(Target) / 100;
+                targetPercentage = QH_GetUnitHealth(Target) / 100;
             end
             if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
@@ -3622,7 +3812,10 @@ function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
     end
 
     if SpellID then
-        --QuickHeal_debug(string.format("  Target: %s / SpellID: %s", UnitFullName(Target), Target));
+        -- Warn if player is moving and spell has a cast time
+        if has_nampower and PlayerIsMoving and PlayerIsMoving() == 1 then
+            QuickHeal_debug("Warning: Player is moving, cast-time spell may fail")
+        end
         ExecuteHeal(Target, SpellID);
     else
         Message("You have no healing spells to cast", "Error", 2);
@@ -3678,13 +3871,13 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
         -- Target is specified, check it
         QuickHeal_debug("********** Heal " .. Target .. " **********");
         if UnitIsHealable(Target, true) then
-            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(Target), Target, UnitHealth(Target),
-                UnitHealthMax(Target)));
+            QuickHeal_debug(string.format("%s (%s) : %d/%d", UnitFullName(Target), Target, QH_GetUnitHealth(Target),
+                QH_GetUnitMaxHealth(Target)));
             local targetPercentage;
             if QuickHeal_UnitHasHealthInfo(Target) then
-                targetPercentage = (UnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / UnitHealthMax(Target);
+                targetPercentage = (QH_GetUnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / QH_GetUnitMaxHealth(Target);
             else
-                targetPercentage = UnitHealth(Target) / 100;
+                targetPercentage = QH_GetUnitHealth(Target) / 100;
             end
             if targetPercentage < QHV.RatioFull or QHV.TestMode then
                 -- Does need healing (fall through to healing code)
@@ -3781,7 +3974,8 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
     -- Check SpellID input
     if not SpellID then
         -- No SpellID specified, find appropriate spell
-        SpellID, HealingSpellSize = FindHealSpellToUse(Target, "channel", 1.0, forceMaxHPS);
+        local healType = extParam and extParam.healType or "channel"
+        SpellID, HealingSpellSize = FindHealSpellToUse(Target, healType, 1.0, forceMaxHPS);
     elseif type(SpellID) == "string" then
         -- Spell specified as string, extract name and possibly rank
         local _, _, sname, srank = string.find(SpellID, "^(..-)%s*(%d*)$")
@@ -3869,9 +4063,9 @@ function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
         if UnitIsHealable(Target, true) then
             local targetPercentage;
             if QuickHeal_UnitHasHealthInfo(Target) then
-                targetPercentage = (UnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / UnitHealthMax(Target);
+                targetPercentage = (QH_GetUnitHealth(Target) + HealComm:getHeal(UnitName(Target))) / QH_GetUnitMaxHealth(Target);
             else
-                targetPercentage = UnitHealth(Target) / 100;
+                targetPercentage = QH_GetUnitHealth(Target) / 100;
             end
             if targetPercentage >= QHV.RatioFull then
                 Message(string.format("%s doesn't need healing", UnitFullName(Target) or Target), "Info", 2);

@@ -74,6 +74,32 @@ end
 local function CheckPriestBuffs(target, inCombat, manaLeft, healneed)
     local forceGH = false
 
+    -- Nampower: use aura spell ID array for reliable detection
+    if GetUnitField then
+        local success, auras = pcall(GetUnitField, "player", "aura")
+        if success and auras then
+            for i = 1, 31 do -- slots 1-31 are buffs
+                local spellId = auras[i]
+                if spellId and spellId > 0 and GetSpellNameAndRankForId then
+                    local name = GetSpellNameAndRankForId(spellId)
+                    if name == "Hand of Edward the Odd" then
+                        QuickHeal_debug("BUFF: Hand of Edward the Odd [" .. spellId .. "] (out of combat healing forced)")
+                        inCombat = false
+                    elseif name == "Hazza'rah's Charm of Healing" or name == "Hazza'rah Charm" then
+                        QuickHeal_debug("BUFF: Hazza'rah buff [" .. spellId .. "] (Greater Heal forced)")
+                        forceGH = true
+                    elseif name == "Inner Focus" or name == "Spirit of Redemption" then
+                        QuickHeal_debug("BUFF: " .. name .. " [" .. spellId .. "] (free mana)")
+                        manaLeft = QH_GetUnitMaxMana('player')
+                        healneed = 1000000
+                    end
+                end
+            end
+            return inCombat, manaLeft, healneed, forceGH
+        end
+    end
+
+    -- Fallback: texture-based detection (when Nampower is not available)
     -- Hand of Edward the Odd - instant cast
     -- Note: Must exclude "Protective Light" which uses icon "Spell_Holy_SearingLightPriest"
     if QuickHeal_DetectBuff('player', "Spell_Holy_SearingLight") and
@@ -92,7 +118,7 @@ local function CheckPriestBuffs(target, inCombat, manaLeft, healneed)
     if QuickHeal_DetectBuff('player', "Spell_Frost_WindWalkOn", 1) or
         QuickHeal_DetectBuff('player', "Spell_Holy_GreaterHeal") then
         QuickHeal_debug("Inner Focus or Spirit of Redemption active")
-        manaLeft = UnitManaMax('player')
+        manaLeft = QH_GetUnitMaxMana('player')
         healneed = 1000000
     end
 
@@ -122,7 +148,7 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
 
     -- Get modifiers
     local mods                                       = GetPriestModifiers()
-    local ManaLeft                                   = UnitMana('player')
+    local ManaLeft                                   = QH_GetUnitMana('player')
 
     -- Check buffs
     local forceGH
@@ -283,7 +309,7 @@ function QuickHeal_Priest_FindHoTSpellToUse(target, healType, forceMaxRank, maxh
 
     -- Get modifiers
     local mods = GetPriestModifiers()
-    local ManaLeft = UnitMana('player')
+    local ManaLeft = QH_GetUnitMana('player')
 
     -- Check buffs
     incombat, ManaLeft, healneed = CheckPriestBuffs(target, incombat, ManaLeft, healneed)
