@@ -3405,8 +3405,13 @@ end
 local function ExecuteHeal(Target, SpellID)
     local TargetWasChanged = false;
 
+    -- Unregister casting events BEFORE stopping the cast, so the SPELLCAST_STOP
+    -- event from the previous cast doesn't race with StartMonitor and hide bars
+    QuickHealConfig:UnregisterEvent("SPELLCAST_STOP");
+    QuickHealConfig:UnregisterEvent("SPELLCAST_FAILED");
+    QuickHealConfig:UnregisterEvent("SPELLCAST_INTERRUPTED");
+
     -- Clear any pending spell state BEFORE starting monitor
-    -- (SpellStopCasting triggers SPELLCAST_STOP which would immediately stop monitor)
     if SpellIsTargeting() then
         SpellStopTargeting()
     end
