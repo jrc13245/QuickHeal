@@ -3629,15 +3629,10 @@ end
 -- Heals the specified Target with the specified Spell
 -- If parameters are missing they will be determined automatically
 function QuickChainHeal(Target, SpellID, extParam, forceMaxRank)
-    -- If a heal is already in progress, cleanly stop it before proceeding.
-    -- This prevents CastCheckSpell from interrupting an active cast mid-frame,
-    -- which causes pfUI (and similar addons) to lose track of the cast bar.
+    -- If a heal is already in progress, let it finish
     if HealingTarget then
-        QuickHealConfig:UnregisterEvent("SPELLCAST_STOP");
-        QuickHealConfig:UnregisterEvent("SPELLCAST_FAILED");
-        QuickHealConfig:UnregisterEvent("SPELLCAST_INTERRUPTED");
-        SpellStopCasting();
-        StopMonitor("Re-cast");
+        QuickHeal_debug("Heal already in progress on " .. (UnitFullName(HealingTarget) or HealingTarget) .. ", ignoring");
+        return;
     end
 
     QuickHealBusy = true;
@@ -3829,15 +3824,12 @@ end
 -- Heals the specified Target with the specified Spell
 -- If parameters are missing they will be determined automatically
 function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
-    -- If a heal is already in progress, cleanly stop it before proceeding.
-    -- This prevents CastCheckSpell from interrupting an active cast mid-frame,
-    -- which causes pfUI (and similar addons) to lose track of the cast bar.
+    -- If a heal is already in progress, let it finish instead of interrupting.
+    -- Spamming /qh would stop the cast and then fail to start a new one because
+    -- CastCheckSpell can't enter targeting mode right after SpellStopCasting().
     if HealingTarget then
-        QuickHealConfig:UnregisterEvent("SPELLCAST_STOP");
-        QuickHealConfig:UnregisterEvent("SPELLCAST_FAILED");
-        QuickHealConfig:UnregisterEvent("SPELLCAST_INTERRUPTED");
-        SpellStopCasting();
-        StopMonitor("Re-cast");
+        QuickHeal_debug("Heal already in progress on " .. (UnitFullName(HealingTarget) or HealingTarget) .. ", ignoring");
+        return;
     end
 
     QuickHealBusy = true;
