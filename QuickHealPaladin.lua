@@ -567,26 +567,26 @@ function qhHShock(SHOCKminHP)
     end
 end
 
--- /run qhBoP(20) - Blessing of Protection on lowest HP ally at 20% threshold
+-- /run qhBoP(20) - Hand of Protection on lowest HP ally at 20% threshold
 -- Skips tanks (MTList) and anyone with aggro to avoid dropping their threat
 function qhBoP(BOPminHP)
     local target, healthPct = GetLowestHealthUnit()
     if target and healthPct < BOPminHP then
-        -- Don't BoP tank-capable classes (BoP drops threat)
+        -- Don't HoP tank-capable classes (HoP drops threat)
         local _, class = UnitClass(target)
         if class == "PALADIN" or class == "DRUID" or class == "SHAMAN" or class == "WARRIOR" then return end
         if SUPERWOW_VERSION then
-            CastSpellByName("Blessing of Protection", target)
+            CastSpellByName("Hand of Protection", target)
         else
             local hadTarget = UnitExists("target")
 
             if target == "player" then
-                CastSpellByName("Blessing of Protection", true)
+                CastSpellByName("Hand of Protection", true)
             elseif UnitIsUnit(target, "target") then
-                CastSpellByName("Blessing of Protection")
+                CastSpellByName("Hand of Protection")
             else
                 TargetUnit(target)
-                CastSpellByName("Blessing of Protection")
+                CastSpellByName("Hand of Protection")
                 if hadTarget then
                     TargetLastTarget()
                 else

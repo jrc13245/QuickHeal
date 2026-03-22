@@ -309,6 +309,8 @@ local HealingSpellSize = 0;
 local StopMonitor;                   -- Forward declaration
 local UpdateQuickHealOverhealStatus; -- Forward declaration
 local HealingTarget;                 -- Contains the unitID of the last player that was attempted healed
+local MonitorStartTime = 0;          -- GetTime() when StartMonitor was called
+local MAX_MONITOR_DURATION = 15;     -- Safety timeout in seconds
 local BlackList = {};                -- List of times were the players are no longer blacklisted
 local LastBlackListTime = 0;
 local HealMultiplier = 1.0;
@@ -1466,6 +1468,27 @@ local function UpdateHealingBar(hpcurrent, hpafter, name)
     QuickHealHealingBarStatusBarPost:SetStatusBarColor(red, green, 0)
 end
 
+-- Get incoming heals on a unit from OTHER healers only (excludes player's own cast)
+-- Used during casting to avoid double-counting our heal in overheal/stopcast checks
+local function GetOtherIncomingHeals(unitName)
+    if not HealComm or not HealComm.getHeal then return 0 end
+    local total = HealComm:getHeal(unitName) or 0
+    -- Subtract our own heal entry from the total
+    if HealComm.Heals and HealComm.Heals[unitName] and HealComm.Heals[unitName][me] then
+        total = total - (HealComm.Heals[unitName][me].amount or 0)
+    end
+    if HealComm.GrpHeals and HealComm.GrpHeals[me] then
+        for _, target in pairs(HealComm.GrpHeals[me].targets or {}) do
+            if target == unitName then
+                total = total - (HealComm.GrpHeals[me].amount or 0)
+                break
+            end
+        end
+    end
+    if total < 0 then total = 0 end
+    return total
+end
+
 -- OnUpdate handler for healing bar - polls health during casting
 local HealingBarUpdateInterval = 0.1 -- Check every 100ms
 local HealingBarTimeSinceLastUpdate = 0
@@ -1478,6 +1501,14 @@ function QuickHeal_HealingBar_OnUpdate(elapsed)
 
     -- Only update if we have a healing target
     if not HealingTarget then
+        return
+    end
+
+    -- Safety timeout: if monitor has been running too long, something went wrong
+    if (GetTime() - MonitorStartTime) > MAX_MONITOR_DURATION then
+        QuickHeal_debug("Monitor timeout after " .. MAX_MONITOR_DURATION .. "s, cleaning up")
+        SpellStopCasting()
+        StopMonitor("Monitor timeout")
         return
     end
 
@@ -1495,11 +1526,11 @@ function QuickHeal_HealingBar_OnUpdate(elapsed)
             StopMonitor("Target out of line of sight")
             return
         end
-        -- Stop if target health is above the full threshold
+        -- Stop if target health (plus other healers' incoming) is above the full threshold
         local healthPct
         if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-            local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-            healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+            local otherHeals = GetOtherIncomingHeals(UnitName(HealingTarget))
+            healthPct = (QH_GetUnitHealth(HealingTarget) + otherHeals) / QH_GetUnitMaxHealth(HealingTarget)
         else
             healthPct = QH_GetUnitHealth(HealingTarget) / 100
         end
@@ -1519,11 +1550,8 @@ UpdateQuickHealOverhealStatus = function(multiplier)
     local textframe = getglobal("QuickHealOverhealStatus_Text");
     local healthpercentagepost, healthpercentage, healneed, overheal, waste;
 
-    -- Get incoming heals from other healers (HealComm integration)
-    local incomingHeal = 0;
-    if HealComm and HealComm.getHeal then
-        incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0;
-    end
+    -- Get incoming heals from OTHER healers only (excludes our own cast to avoid double-counting)
+    local incomingHeal = GetOtherIncomingHeals(UnitName(HealingTarget));
 
     -- Determine healneed on HealingTarget
     if QuickHeal_UnitHasHealthInfo(HealingTarget) then
@@ -1534,7 +1562,7 @@ UpdateQuickHealOverhealStatus = function(multiplier)
             QuickHeal_debug("OVERHEAL OVERHEAL OVERHEAL");
         end
 
-        -- Account for incoming heals in healneed calculation
+        -- Account for other healers' incoming heals in healneed calculation
         local currentHealth = QH_GetUnitHealth(HealingTarget) + incomingHeal;
         local maxHealth = QH_GetUnitMaxHealth(HealingTarget);
         healneed = maxHealth - currentHealth;
@@ -1544,7 +1572,7 @@ UpdateQuickHealOverhealStatus = function(multiplier)
     else
         -- Estimate target health
         healneed = QuickHeal_EstimateUnitHealNeed(HealingTarget);
-        -- Reduce healneed by incoming heals (estimate based on percentage)
+        -- Reduce healneed by other healers' incoming heals
         healneed = healneed - incomingHeal;
         if healneed < 0 then healneed = 0; end
         healthpercentage = QH_GetUnitHealth(HealingTarget) / 100;
@@ -1605,6 +1633,7 @@ end
 function StartMonitor(Target, multiplier)
     MassiveOverhealInProgress = false;
     HealingTarget = Target;
+    MonitorStartTime = GetTime();
 
     if multiplier then
         HealMultiplier = multiplier;
@@ -1681,7 +1710,10 @@ function NewUIErrorsFrame_OnEvent(...)
             -- "You are facing the wrong way!"; -- Melee combat error
             -- "You are too far away!"; -- Melee combat error
         else
-            StopMonitor(event .. " : " .. arg1);
+            -- Only log unrecognized errors, don't stop the monitor
+            -- Unrelated UI errors (e.g. "Can't do that while moving", "Not enough mana" from
+            -- other spells) should not cancel an in-progress heal
+            QuickHeal_debug("UI_ERROR_MESSAGE during heal (ignored): " .. tostring(arg1));
         end
     end
     return { OriginalUIErrorsFrame_OnEvent(unpack(arg)) };
@@ -1712,11 +1744,11 @@ function QuickHeal_OnEvent()
                     StopMonitor("Target out of line of sight")
                     return
                 end
-                -- Stop if target health (including incoming heals) is above the full threshold
+                -- Stop if target health (plus other healers' incoming) is above the full threshold
                 local healthPct
                 if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-                    local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-                    healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+                    local otherHeals = GetOtherIncomingHeals(UnitName(HealingTarget))
+                    healthPct = (QH_GetUnitHealth(HealingTarget) + otherHeals) / QH_GetUnitMaxHealth(HealingTarget)
                 else
                     healthPct = QH_GetUnitHealth(HealingTarget) / 100
                 end
@@ -1741,8 +1773,8 @@ function QuickHeal_OnEvent()
                     end
                     local healthPct
                     if QuickHeal_UnitHasHealthInfo(HealingTarget) then
-                        local incomingHeal = HealComm:getHeal(UnitName(HealingTarget)) or 0
-                        healthPct = (QH_GetUnitHealth(HealingTarget) + incomingHeal) / QH_GetUnitMaxHealth(HealingTarget)
+                        local otherHeals = GetOtherIncomingHeals(UnitName(HealingTarget))
+                        healthPct = (QH_GetUnitHealth(HealingTarget) + otherHeals) / QH_GetUnitMaxHealth(HealingTarget)
                     else
                         healthPct = QH_GetUnitHealth(HealingTarget) / 100
                     end
@@ -1755,8 +1787,19 @@ function QuickHeal_OnEvent()
             end
         end
     elseif (event == "SPELLCAST_STOP") or (event == "SPELLCAST_FAILED") or (event == "SPELLCAST_INTERRUPTED") then
-        -- Spellcasting has stopped
-        StopMonitor(event);
+        -- With Nampower, check if a cast is still in progress before stopping.
+        -- A stale SPELLCAST_STOP (from SpellStopCasting cleanup) can arrive while
+        -- our new heal is actively casting - GetCastInfo() will be non-nil in that case.
+        if event == "SPELLCAST_STOP" and has_nampower and GetCastInfo then
+            local ok, info = pcall(GetCastInfo)
+            if ok and info then
+                QuickHeal_debug("Ignoring stale SPELLCAST_STOP (cast still active, spellId=" .. (info.spellId or "?") .. ")")
+            else
+                StopMonitor(event);
+            end
+        else
+            StopMonitor(event);
+        end
     elseif (event == "LEARNED_SPELL_IN_TAB") then
         -- New spells learned, clear spell cache
         QuickHeal_ClearSpellCache();
@@ -3414,7 +3457,16 @@ local function ExecuteHeal(Target, SpellID)
     if SpellIsTargeting() then
         SpellStopTargeting()
     end
-    SpellStopCasting()
+    -- Only stop casting if there's an active cast (Nampower GetCastInfo check)
+    -- Avoids generating a stale SPELLCAST_STOP that could hide the healing bar
+    if has_nampower and GetCastInfo then
+        local ok, startTime = pcall(GetCastInfo)
+        if ok and startTime then
+            SpellStopCasting()
+        end
+    else
+        SpellStopCasting()
+    end
 
     -- Setup the monitor and related events
     StartMonitor(Target);
