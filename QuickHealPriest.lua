@@ -179,6 +179,59 @@ function QuickHeal_Priest_FindHealSpellToUse(target, healType, multiplier, force
     local ihMod                                      = mods.ihMod
     local healMod15, healMod20, healMod25, healMod30 = mods.healMod15, mods.healMod20, mods.healMod25, mods.healMod30
 
+    -- Book of Prayer path - alternate between Greater Heal and Flash Heal
+    if healType == "book" and not forceGH and maxRankGH >= 1 and maxRankFH >= 1 then
+        local useGH = (QH_BookLastSpell ~= "gh") -- default to GH if nil or last was FH
+        if useGH then
+            -- Use Greater Heal path (same rank selection as normal heal)
+            if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
+                if ManaLeft >= 351 * ihMod and downRankNH >= 8 and SpellIDsGH[1] then
+                    SpellID = SpellIDsGH[1]; HealSize = (838 + healMod30) * shMod
+                end
+                if (healneed > (1066 + healMod30) * K * shMod or 9 <= minRankNH) and ManaLeft >= 432 * ihMod and maxRankGH >= 2 and downRankNH >= 9 and SpellIDsGH[2] then
+                    SpellID = SpellIDsGH[2]; HealSize = (1066 + healMod30) * shMod
+                end
+                if (healneed > (1328 + healMod30) * K * shMod or 10 <= minRankNH) and ManaLeft >= 517 * ihMod and maxRankGH >= 3 and downRankNH >= 10 and SpellIDsGH[3] then
+                    SpellID = SpellIDsGH[3]; HealSize = (1328 + healMod30) * shMod
+                end
+                if (healneed > (1632 + healMod30) * K * shMod or 11 <= minRankNH) and ManaLeft >= 622 * ihMod and maxRankGH >= 4 and downRankNH >= 11 and SpellIDsGH[4] then
+                    SpellID = SpellIDsGH[4]; HealSize = (1632 + healMod30) * shMod
+                end
+                if (healneed > (1768 + healMod30) * K * shMod or 12 <= minRankNH) and ManaLeft >= 674 * ihMod and maxRankGH >= 5 and downRankNH >= 12 and SpellIDsGH[5] then
+                    SpellID = SpellIDsGH[5]; HealSize = (1768 + healMod30) * shMod
+                end
+                if SpellID then QH_BookLastSpell = "gh" end
+            end
+        else
+            -- Use Flash Heal path
+            if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
+                if ManaLeft >= 125 and downRankFH >= 1 and SpellIDsFH[1] then
+                    SpellID = SpellIDsFH[1]; HealSize = (225 + healMod15) * shMod
+                end
+                if (healneed > (297 + healMod15) * k * shMod or 2 <= minRankFH) and ManaLeft >= 155 and maxRankFH >= 2 and downRankFH >= 2 and SpellIDsFH[2] then
+                    SpellID = SpellIDsFH[2]; HealSize = (297 + healMod15) * shMod
+                end
+                if (healneed > (319 + healMod15) * k * shMod or 3 <= minRankFH) and ManaLeft >= 185 and maxRankFH >= 3 and downRankFH >= 3 and SpellIDsFH[3] then
+                    SpellID = SpellIDsFH[3]; HealSize = (319 + healMod15) * shMod
+                end
+                if (healneed > (387 + healMod15) * k * shMod or 4 <= minRankFH) and ManaLeft >= 215 and maxRankFH >= 4 and downRankFH >= 4 and SpellIDsFH[4] then
+                    SpellID = SpellIDsFH[4]; HealSize = (387 + healMod15) * shMod
+                end
+                if (healneed > (498 + healMod15) * k * shMod or 5 <= minRankFH) and ManaLeft >= 265 and maxRankFH >= 5 and downRankFH >= 5 and SpellIDsFH[5] then
+                    SpellID = SpellIDsFH[5]; HealSize = (498 + healMod15) * shMod
+                end
+                if (healneed > (618 + healMod15) * k * shMod or 6 <= minRankFH) and ManaLeft >= 315 and maxRankFH >= 6 and downRankFH >= 6 and SpellIDsFH[6] then
+                    SpellID = SpellIDsFH[6]; HealSize = (618 + healMod15) * shMod
+                end
+                if (healneed > (769 + healMod15) * k * shMod or 7 <= minRankFH) and ManaLeft >= 380 and maxRankFH >= 7 and downRankFH >= 7 and SpellIDsFH[7] then
+                    SpellID = SpellIDsFH[7]; HealSize = (769 + healMod15) * shMod
+                end
+                if SpellID then QH_BookLastSpell = "fh" end
+            end
+        end
+        if SpellID then return SpellID, HealSize * HDB end
+    end
+
     -- Hazza'rah buff path - force Greater Heal
     if forceGH and ManaLeft >= 351 * ihMod and maxRankGH >= 1 and downRankNH >= 8 and SpellIDsGH[1] then
         if Health < QuickHealVariables.RatioFull or QHV.TestMode or (QHV.PrecastAggro and QuickHeal_UnitHasAggro(target)) then
@@ -415,6 +468,133 @@ function QuickHealSpellID(healneed)
     return SpellName, rankNum
 end
 
+-- Prayer of Healing spell data: {rank, avgHeal, manaCost}
+local PoH_Data = {
+    {1, 312, 410},   -- PoH Rank 1, avg heal per target
+    {2, 458, 560},   -- PoH Rank 2
+    {3, 675, 770},   -- PoH Rank 3
+    {4, 939, 1030},  -- PoH Rank 4
+    {5, 1101, 1070}, -- PoH Rank 5
+}
+
+-- Find the best raid subgroup to target with Prayer of Healing
+-- Returns: unitID of a member in the best group, or nil
+function QuickHeal_Priest_FindPoHTarget()
+    local numRaid = GetNumRaidMembers()
+
+    -- Must be in a raid or party
+    if numRaid == 0 and GetNumPartyMembers() == 0 then
+        return nil
+    end
+
+    -- Party mode (not in raid): just target self since PoH heals target's party
+    if numRaid == 0 then
+        return "player"
+    end
+
+    -- Raid mode: score each subgroup by total health deficit
+    local groupDeficit = {}  -- [groupNum] = total deficit
+    local groupMember = {}   -- [groupNum] = unitID of a healable member in that group
+    local groupCount = {}    -- [groupNum] = number of injured healable members
+
+    for i = 1, numRaid do
+        local unit = "raid" .. i
+        if UnitIsHealable(unit, true) then
+            local _, _, subgroup = GetRaidRosterInfo(i)
+            if subgroup then
+                local deficit = 0
+                if QuickHeal_UnitHasHealthInfo(unit) then
+                    deficit = QH_GetUnitMaxHealth(unit) - QH_GetUnitHealth(unit)
+                else
+                    -- Estimated deficit from percentage
+                    local pct = QH_GetUnitHealth(unit) -- returns 0-100 without health info
+                    deficit = (100 - pct) * 50 -- rough estimate
+                end
+
+                if deficit > 0 then
+                    groupDeficit[subgroup] = (groupDeficit[subgroup] or 0) + deficit
+                    groupCount[subgroup] = (groupCount[subgroup] or 0) + 1
+                    if not groupMember[subgroup] then
+                        groupMember[subgroup] = unit
+                    end
+                end
+            end
+        end
+    end
+
+    -- Find the group with the highest total deficit
+    local bestGroup = nil
+    local bestDeficit = 0
+    for grp, deficit in pairs(groupDeficit) do
+        if deficit > bestDeficit then
+            bestDeficit = deficit
+            bestGroup = grp
+        end
+    end
+
+    if bestGroup and groupMember[bestGroup] then
+        QuickHeal_debug(string.format("PoH: Best group %d with total deficit %d (%d injured)",
+            bestGroup, bestDeficit, groupCount[bestGroup] or 0))
+        return groupMember[bestGroup]
+    end
+
+    return nil
+end
+
+-- Select the appropriate rank of Prayer of Healing
+-- Returns: SpellID, HealSize (per target)
+function QuickHeal_Priest_FindPoHSpellToUse()
+    local SpellIDsPoH = QuickHeal_GetSpellIDs(QUICKHEAL_SPELL_PRAYER_OF_HEALING)
+    local maxRankPoH = table.getn(SpellIDsPoH)
+
+    if maxRankPoH < 1 then return nil, 0 end
+
+    local mods = GetPriestModifiers()
+    local ManaLeft = QH_GetUnitMana('player')
+    local shMod = mods.shMod
+    -- PoH is 3.0s cast, use 3.0/3.5 coefficient with 0.85 downrank penalty
+    local healMod30 = mods.healMod30
+
+    -- Check buffs for free mana
+    local incombat = UnitAffectingCombat('player')
+    incombat, ManaLeft = CheckPriestBuffs(nil, incombat, ManaLeft, 1000000)
+
+    local SpellID = nil
+    local HealSize = 0
+
+    -- Select highest affordable rank
+    for r = 1, maxRankPoH do
+        if r <= table.getn(PoH_Data) and SpellIDsPoH[r] then
+            local data = PoH_Data[r]
+            if ManaLeft >= data[3] then
+                SpellID = SpellIDsPoH[r]
+                HealSize = (data[2] + healMod30) * shMod
+            end
+        end
+    end
+
+    return SpellID, HealSize
+end
+
+-- Execute Prayer of Healing on the best group
+-- Uses QuickHeal() with explicit Target + SpellID to leverage full cast logic
+function QuickHeal_Priest_PrayerOfHealing()
+    local Target = QuickHeal_Priest_FindPoHTarget()
+    if not Target then
+        writeLine("QuickHeal: No group needs healing", 1, 1, 0)
+        return
+    end
+
+    local SpellID, HealSize = QuickHeal_Priest_FindPoHSpellToUse()
+    if not SpellID then
+        writeLine("QuickHeal: Prayer of Healing not available", 1, 0, 0)
+        return
+    end
+
+    QuickHeal_debug(string.format("PoH: Targeting %s (%s)", UnitFullName(Target) or "?", Target))
+    QuickHeal(Target, SpellID)
+end
+
 -- Command handler
 function QuickHeal_Command_Priest(msg)
     local _, _, arg1, arg2, arg3 = string.find(msg, "%s?(%w+)%s?(%w+)%s?(%w+)")
@@ -482,6 +662,10 @@ function QuickHeal_Command_Priest(msg)
                 QuickHeal(arg4, nil, nil, false)
                 return
             end
+            if arg5 == "book" then
+                QuickHeal(arg4, nil, {healType = "book"})
+                return
+            end
         end
     end
 
@@ -515,6 +699,14 @@ function QuickHeal_Command_Priest(msg)
         QuickHeal_ReportDLLStatus()
         return
     end
+    if cmd == "book" then
+        QuickHeal(nil, nil, {healType = "book"})
+        return
+    end
+    if cmd == "poh" then
+        QuickHeal_Priest_PrayerOfHealing()
+        return
+    end
     if cmd == "heal" then
         QuickHeal()
         return
@@ -542,6 +734,8 @@ function QuickHeal_Command_Priest(msg)
         "/qh downrank | dr | minrank | ranks - Opens the slider to limit QuickHeal to constrain healing to lower ranks.")
     writeLine("/qh tanklist | tl - Toggles display of the main tank list UI.")
     writeLine("/qh reset - Reset configuration to default parameters.")
+    writeLine("/qh [mask] book - Heal using Book of Prayer (alternates GH/FH for mana refund).")
+    writeLine("/qh poh - Prayer of Healing on the raid group with highest total health deficit.")
     writeLine("/qh [mask] [type] [mod] - Heals the party/raid member that most needs it.")
     writeLine(" [mask]: player, target, targettarget, party, mt, nonmt, subgroup")
     writeLine(" [type]: heal (channeled), hot (Renew)")

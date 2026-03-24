@@ -1,29 +1,28 @@
 # QuickHeal for Turtle WoW
 
-QuickHeal automates healing spell selection and targeting for healers. It heals the lowest health party/raid member without requiring manual targeting, automatically selects the optimal spell rank based on health deficit and mana, and works with Priest, Druid, Paladin, and Shaman.
+QuickHeal automates healing spell selection and targeting for healers. It finds the lowest health party or raid member, picks the best spell rank for the deficit and your mana, and casts it — no manual targeting required. Works with Priest, Druid, Paladin, and Shaman.
 
 ## Installation
 
 Download QuickHeal into your `Interface/AddOns` folder. Ensure the folder is named `QuickHeal` (remove any `-main` suffix).
 
-## Commands
+## General Commands
 
 | Command | Description |
 |---------|-------------|
 | `/qh` | Heal the lowest health target |
 | `/qh cfg` | Open configuration panel |
-| `/qh dr` | Open downrank slider window |
-| `/qh toggle` | Toggle between Normal and High HPS mode |
-| `/qh tanklist` | Toggle tank list display |
-| `/qh help` | Show help in chat |
+| `/qh dr` or `/qh downrank` or `/qh ranks` | Open downrank/minrank slider window |
+| `/qh toggle` | Toggle between Normal HPS and High HPS mode |
+| `/qh tanklist` or `/qh tl` | Toggle main tank list display |
 | `/qh dll` | Report DLL enhancement status |
-| `/qh test on/off` | Toggle test mode (ignores health thresholds) |
-| `/qh debug on/off` | Toggle debug output |
+| `/qh test on\|off` | Toggle test mode (ignores health thresholds) |
+| `/qh debug on\|off` | Toggle debug output |
 | `/qh reset` | Reset configuration to defaults |
 
 ### Target Masks
 
-Constrain who can be healed by adding a mask:
+Constrain who can be healed by adding a mask before the command:
 
 | Mask | Targets |
 |------|---------|
@@ -31,17 +30,27 @@ Constrain who can be healed by adding a mask:
 | `target` | Your current target |
 | `targettarget` | Your target's target |
 | `party` | Party members only |
+| `subgroup` | Configured raid subgroups |
 | `mt` | Main tanks only |
 | `nonmt` | Non-tanks only |
-| `subgroup` | Configured raid subgroups |
 
-Example: `/qh mt` heals only tanks, `/qh party` heals only party members.
+Examples: `/qh mt` heals only tanks. `/qh party hot` casts a HoT on a party member.
+
+### Heal Types and Modifiers
+
+| Suffix | Effect |
+|--------|--------|
+| `heal` | Direct heal (default) |
+| `hot` | HoT spell (Renew, Rejuvenation) |
+| `heal max` | Direct heal at max rank |
+| `hot max` | HoT at max rank |
+| `hot fh` | Firehose — max rank HoT ignoring HP check |
 
 ### HPS Modes
 
-**Normal HPS**: Uses all healing spells for maximum mana efficiency.
+**Normal HPS**: Uses the full spell pyramid (Lesser Heal / Heal / Greater Heal, Healing Touch, Holy Light, Healing Wave) for mana efficiency.
 
-**High HPS**: Restricted to fast-casting spells (Flash Heal, Flash of Light, Lesser Healing Wave, Regrowth) for maximum throughput at the cost of mana efficiency.
+**High HPS**: Restricted to fast-cast spells (Flash Heal, Regrowth, Flash of Light, Lesser Healing Wave) for maximum throughput at the cost of mana.
 
 Toggle with `/qh toggle`.
 
@@ -49,14 +58,36 @@ Toggle with `/qh toggle`.
 
 ## Priest
 
-**Spells used**: Lesser Heal, Heal, Greater Heal, Flash Heal, Renew
+**Spells used**: Lesser Heal, Heal, Greater Heal, Flash Heal, Renew, Prayer of Healing
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/qh` | Optimal direct heal on lowest health target |
+| `/qh hot` | Renew on lowest health target without an active HoT |
+| `/qh hot max` | Max rank Renew |
+| `/qh hot fh` | Firehose — spam max rank Renew ignoring HP check |
+| `/qh book` | Book of Prayer heal — alternates Greater Heal and Flash Heal |
+| `/qh poh` | Prayer of Healing on the raid group with highest total deficit |
+| `/qh [mask] book` | Book of Prayer with a target mask (e.g. `/qh mt book`) |
+
+### Book of Prayer
+
+The `/qh book` command alternates between Greater Heal and Flash Heal to trigger the Book of Prayer talent, which refunds 15%/30% of a healing spell's mana cost when it differs from the previous healing spell. Rank selection still follows your downrank and minrank settings.
+
+### Prayer of Healing
+
+The `/qh poh` command scores each raid subgroup by total health deficit (the sum of missing HP across all members in the group). The group with the highest combined deficit is selected, and Prayer of Healing is cast on a member of that group. This prefers groups with multiple injured members over groups with a single heavily damaged player.
+
+In a party (not raid), `/qh poh` targets yourself since Prayer of Healing heals the target's party within 36 yards.
 
 ### Recommended Macros
 
 ```
 /qh
 ```
-Basic heal - selects optimal direct heal spell and rank.
+Basic heal — selects optimal direct heal spell and rank.
 
 ```
 /qh hot
@@ -64,14 +95,14 @@ Basic heal - selects optimal direct heal spell and rank.
 Cast Renew on the lowest health target without an active HoT.
 
 ```
-/qh hot max
+/qh book
 ```
-Cast max rank Renew on the lowest health target.
+Alternating GH/FH heal for Book of Prayer mana refund.
 
 ```
-/qh hot fh
+/qh poh
 ```
-Firehose mode - spam max rank Renew on targets without a HoT (useful for Naxx gargoyles).
+Prayer of Healing on the most injured raid group.
 
 ---
 
@@ -79,27 +110,30 @@ Firehose mode - spam max rank Renew on targets without a HoT (useful for Naxx ga
 
 **Spells used**: Healing Touch, Regrowth, Rejuvenation
 
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/qh` | Optimal Healing Touch or Regrowth based on health threshold |
+| `/qh ht` | Force Healing Touch |
+| `/qh rg` | Force Regrowth |
+| `/qh hot` | Rejuvenation on lowest health target without an active HoT |
+| `/qh hot max` | Max rank Rejuvenation |
+| `/qh hot fh` | Firehose — spam max rank Rejuvenation |
+| `/qh [mask] ht` | Force Healing Touch with a target mask |
+| `/qh [mask] rg` | Force Regrowth with a target mask |
+
 ### Recommended Macros
 
 ```
 /qh
 ```
-Basic heal - selects optimal Healing Touch or Regrowth rank.
+Basic heal — selects Healing Touch or Regrowth based on the healthy threshold.
 
 ```
 /qh hot
 ```
 Cast Rejuvenation on the lowest health target without an active HoT.
-
-```
-/qh hot max
-```
-Cast max rank Rejuvenation.
-
-```
-/qh hot fh
-```
-Firehose mode - spam max rank Rejuvenation.
 
 ```
 /script QuickHeal(nil,'Swiftmend')
@@ -109,7 +143,7 @@ Cast Swiftmend (works while moving).
 ```
 /script QuickHeal(nil,'Regrowth')
 ```
-Force Regrowth at max rank regardless of heal need.
+Force max rank Regrowth regardless of heal need.
 
 ---
 
@@ -117,38 +151,25 @@ Force Regrowth at max rank regardless of heal need.
 
 **Spells used**: Holy Light, Flash of Light, Holy Shock
 
-### Recommended Macros
+### Commands
 
-```
-/qh
-```
-Basic heal - selects Holy Light or Flash of Light based on heal need and talents.
-
-```
-/qh hs
-```
-Cast Holy Shock on the lowest health target. Cancels autoattack.
-
-```
-/qh hs max
-```
-Cast max rank Holy Shock.
-
-```
-/qh heal max
-```
-Cast max rank Flash of Light (or Holy Light if Holy Judgement buff active).
+| Command | Description |
+|---------|-------------|
+| `/qh` | Optimal Holy Light or Flash of Light |
+| `/qh hs` | Holy Shock on lowest health target (cancels autoattack) |
+| `/qh hs max` | Max rank Holy Shock |
+| `/qh heal max` | Max rank Flash of Light (or Holy Light with Holy Judgement buff) |
 
 ### Blessing of Protection
 
 ```
 /run qhBoP(20)
 ```
-Cast Blessing of Protection on the lowest HP ally below the given threshold (20% in this example). Useful for saving a low-health target from physical damage.
+Cast Blessing of Protection on the lowest HP ally below the given threshold (20% in this example).
 
 ### Melee Paladin Macros
 
-These macros are for paladins healing in melee range and do not cancel autoattack:
+These macros do not cancel autoattack:
 
 ```
 /run qhHShock(85)
@@ -166,22 +187,25 @@ Cast Holy Strike if 3+ targets are below 93% HP.
 
 **Spells used**: Healing Wave, Lesser Healing Wave, Chain Heal
 
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/qh` | Optimal Healing Wave or Lesser Healing Wave |
+| `/qh chainheal` | Chain Heal on lowest health target |
+| `/qh chainheal max` | Max rank Chain Heal |
+
 ### Recommended Macros
 
 ```
 /qh
 ```
-Basic heal - selects optimal Healing Wave or Lesser Healing Wave rank.
+Basic heal — selects optimal Healing Wave or Lesser Healing Wave rank.
 
 ```
 /qh chainheal
 ```
 Cast Chain Heal on the lowest health target.
-
-```
-/qh chainheal max
-```
-Cast max rank Chain Heal.
 
 ---
 
@@ -189,180 +213,163 @@ Cast max rank Chain Heal.
 
 Open the config panel with `/qh cfg`. Key settings:
 
-- **Healthy Threshold**: Skip healing targets above this HP percentage
-- **Force Self-Heal**: Prioritize self when below this HP percentage
-- **Target Priority**: Heal current target first if they need healing
-- **Subgroups**: Select which raid groups to heal
-- **Tank List**: Add tanks via `/qh tanklist` then click `+` with a tank targeted
+- **Healthy Threshold**: HP percentage above which targets are skipped. Below this threshold, fast heals (Flash Heal, Regrowth, etc.) are used in combat; above it, slow efficient heals are used.
+- **Force Self-Heal**: Prioritize self when below this HP percentage.
+- **Target Priority**: Always heal current target first if they need healing.
+- **Subgroups**: Select which raid groups to include when healing.
+- **Tank List**: Add tanks via `/qh tanklist` then click `+` with a tank targeted.
 
 ### Downranking
 
-Open the downrank window with `/qh dr`. The slider limits the maximum spell rank QuickHeal will use, allowing you to conserve mana by using lower ranks.
+Open the downrank window with `/qh dr`. Two sliders control the rank range:
 
-### Mouse-Click Healing
+- **Max rank**: Upper bound on spell rank QuickHeal will use.
+- **Min rank**: Lower bound — QuickHeal will never pick a rank below this.
 
-QuickHeal supports mouse-click healing. Hold **Ctrl** and left-click on any unit frame (player, target, party member, etc.) to trigger a heal. This works with Blizzard frames and many popular unit frame addons including Discord Unit Frames, Perl Classic, X-Perl, EasyRaid, and CT Raid Assist.
+This lets you cap mana usage or force higher ranks for throughput.
 
-Enable/disable in configuration panel.
+### QuickClick (Mouse-Click Healing)
+
+QuickClick lets you heal by Ctrl+clicking unit frames instead of using slash commands. When enabled, holding **Ctrl** and **left-clicking** any supported unit frame calls QuickHeal directly on that unit — it picks the best spell rank for their deficit and casts it immediately, bypassing the normal "find lowest health" search.
+
+If Ctrl is not held, the click behaves normally (targeting, selecting, etc.).
+
+**Supported unit frames:**
+- Blizzard default frames (player, pet, target, target-of-target, party)
+- pfUI
+- CT Raid Assist
+- EasyRaid
+- Discord Unit Frames
+- Perl Classic / X-Perl
+
+Enable or disable QuickClick in the configuration panel (`/qh cfg`).
 
 ---
 
-## Stopcasting Function
+## Stopcasting
 
-QuickHeal includes intelligent stopcasting to prevent wasted heals and mana. When a heal is in progress, it automatically checks several conditions and can cancel the cast if needed.
+QuickHeal includes intelligent stopcasting to prevent wasted heals. When a heal is in progress, it monitors conditions and can cancel the cast.
 
-### How Stopcasting Works
+### Stop Conditions
 
-When you start casting a heal, QuickHeal monitors the situation and can stop the cast if:
+1. **Target dies** — always stops immediately.
+2. **Line of Sight lost** — stops if target moves behind a wall (requires UnitXP).
+3. **Overheal threshold exceeded** — stops if the heal would waste too much health.
 
-1. **Target dies** - Always stops immediately
-2. **Line of Sight lost** - Stops if target moves behind a wall
-3. **Overheal threshold exceeded** - Stops if the heal would waste too much health
+### Settings
 
-### Stopcasting Settings
-
-These settings control when QuickHeal stops a cast:
-
-#### **StopcastCheckWindow** (Default: 0)
-Controls **when** the addon checks for stop conditions during a cast.
-
-- **0** = Always check from the start of the cast
-- **1.5** = Only check if ≤ 1.5 seconds remain in the cast
-- **3.0** = Only check if ≤ 3 seconds remain
-
-**Use case**: Set to 0 for maximum safety. Set higher if you want to avoid interruptions early in long casts.
-
-#### **MaxOverhealPercent** (Default: 50)
-Controls **how much overheal** is tolerated before stopping.
-
-- **0** = Never stop for overheal
-- **50** = Stop if heal is ≥ 50% overheal (half the heal is wasted)
-- **100** = Stop only if target is already at full health
-
-**Use case**: Lower values prevent waste but may interrupt needed heals. Higher values complete more heals but waste more mana.
-
-### Example Scenarios
-
-**Scenario 1**: You're casting a 3-second heal on a tank taking damage.
-- `StopcastCheckWindow = 0`, `MaxOverhealPercent = 50`
-- At 1.5 seconds remaining, tank gets a big heal from another healer
-- QuickHeal calculates: heal would be 70% overheal → **STOPS** the cast
-
-**Scenario 2**: You're casting a 1.5-second Flash Heal on a low-health DPS.
-- `StopcastCheckWindow = 1.5`, `MaxOverhealPercent = 50`
-- Since remaining time (1.5s) equals the window (1.5s), checks run
-- DPS moves behind a pillar → **STOPS** the cast (LOS)
-
-**Scenario 3**: You want to always complete your casts.
-- `StopcastCheckWindow = 3.0`, `MaxOverhealPercent = 100`
-- Most casts complete unless target dies or is already full health
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `StopcastCheckWindow` | 0 | Only check stop conditions when this many seconds or fewer remain in the cast. 0 = always check. |
+| `MaxOverhealPercent` | 50 | Stop the cast if overheal would exceed this percentage. 0 = never stop for overheal. 100 = stop only at full health. |
 
 ### Tips
 
-- **PvP**: Use low `StopcastCheckWindow` (0-0.5) to react quickly to target changes
-- **Raid healing**: Use moderate `MaxOverhealPercent` (30-50) to balance efficiency and safety
-- **Tank healing**: Use high `MaxOverhealPercent` (70-100) to ensure tanks get every heal
+- **PvP**: Low `StopcastCheckWindow` (0–0.5) to react quickly.
+- **Raid healing**: Moderate `MaxOverhealPercent` (30–50) for efficiency.
+- **Tank healing**: High `MaxOverhealPercent` (70–100) to ensure heals land.
 
 ---
 
 ## Aggro Detection and Pre-Healing
 
-QuickHeal includes advanced aggro detection features to help you pre-heal targets that are about to take damage.
+QuickHeal detects when friendly units are being targeted by enemies and can pre-heal them before damage lands.
 
-### How Aggro Detection Works
+### Detection Methods
 
-QuickHeal detects when a friendly unit is being targeted by enemies using:
-- **GUID-based tracking**: Compares enemy target GUIDs with friendly unit GUIDs (requires Nampower DLL) - WIP 
-- **UnitIsUnit fallback**: Traditional method using unit ID comparison
-- **Spell cast events**: Tracks recent spell casts on units (requires Nampower DLL) - WIP
+- **GUID-based tracking**: Compares enemy target GUIDs with friendly unit GUIDs (requires Nampower DLL).
+- **UnitIsUnit fallback**: Traditional method using unit ID comparison.
 
-### Precast Aggro Settings
+### Settings
 
-Configure aggro pre-healing in the configuration panel:
+Configure in the configuration panel:
 
-- **Precast Aggro Targets**: Enable healing on aggro targets even when they don't meet normal healthy thresholds
-- **Pre-HOT Aggro Targets**: Enable HoT casting on aggro targets
-- **Aggro Target Preference**: Choose between healing highest or lowest max health aggro targets first
-
-### Example Usage
-
-```
-/qh
-```
-When aggro detection is enabled and a target has aggro, QuickHeal will heal them even if their health is above the normal healthy threshold.
+- **Precast Aggro Targets**: Heal targets with aggro even above the normal healthy threshold.
+- **Pre-HOT Aggro Targets**: Cast HoTs on aggro targets preemptively.
+- **Aggro Target Preference**: Heal highest or lowest max-health aggro target first.
 
 ---
 
 ## Keybindings
 
-QuickHeal includes the following keybindings (accessible through WoW keybinding menu):
+Accessible through the WoW keybinding menu:
 
-- **QuickHeal Heal** - Main healing function
-- **QuickHeal HoT** - HoT casting function
-- **QuickHeal HoT Firehose** - HoT firehose mode (Naxx gargoyles)
-- **QuickHeal Heal Subgroup** - Heal configured raid subgroups
-- **QuickHeal HoT Subgroup** - HoT configured raid subgroups
-- **QuickHeal Heal Party** - Heal party members only
-- **QuickHeal Heal MT** - Heal main tanks only
-- **QuickHeal HoT MT** - HoT main tanks only
-- **QuickHeal Heal NonMT** - Heal non-tanks only
-- **QuickHeal Heal Self** - Heal yourself only
-- **QuickHeal Heal Target** - Heal current target
-- **QuickHeal Heal Target's Target** - Heal your target's target
-- **QuickHeal Toggle Healthy Threshold** - Toggle between Normal and High HPS modes
-- **QuickHeal Show/Hide Downrank Window** - Toggle downrank slider
+| Keybind | Action |
+|---------|--------|
+| QuickHeal Heal | Main healing function |
+| QuickHeal HoT | HoT casting |
+| QuickHeal HoT Firehose | HoT firehose mode |
+| QuickHeal Heal Subgroup | Heal configured raid subgroups |
+| QuickHeal HoT Subgroup | HoT configured raid subgroups |
+| QuickHeal Heal Party | Heal party members only |
+| QuickHeal Heal MT | Heal main tanks only |
+| QuickHeal HoT MT | HoT main tanks only |
+| QuickHeal Heal NonMT | Heal non-tanks only |
+| QuickHeal Heal Self | Heal yourself |
+| QuickHeal Heal Target | Heal current target |
+| QuickHeal Heal Target's Target | Heal your target's target |
+| QuickHeal Toggle Healthy Threshold | Toggle HPS mode |
+| QuickHeal Show/Hide Downrank Window | Toggle downrank slider |
 
 ---
 
 ## DLL Enhancements
 
-QuickHeal can utilize optional DLL enhancements for improved functionality:
+QuickHeal can utilize optional DLL enhancements for improved functionality. Run `/qh dll` to check which are detected.
 
 ### Nampower
-- Provides `GetCastInfo` for accurate cast time tracking
-- `IsSpellInRange` for reliable range checking
-- `GetUnitField` for reading unit health/mana directly from memory
-- GUID-based aggro detection (TODO)
-- Spell cast event tracking (TODO)
+
+- `GetCastInfo` — accurate cast time tracking
+- `IsSpellInRange` — reliable range checking
+- `GetUnitField` — read unit health/mana directly from memory
+- `GetSpellModifiers` — spell coefficient and modifier data
+- `GetPlayerAuraDuration` — buff/debuff duration tracking
+- Spell pushback and failure event handling
 
 ### UnitXP_SP3
-- `UnitXP("distanceBetween")` for accurate distance measurement
-- `UnitXP("inSight")` for line of sight detection
+
+- `UnitXP("distanceBetween")` — accurate distance measurement (40-yard range check)
+- `UnitXP("inSight")` — line of sight detection
 
 ### SuperWoW
-- `SpellInfo` for spell information lookup
-- GUID-based targeting for more reliable unit tracking
 
-Run `/qh dll` to check which DLLs are detected on your system.
+- `SpellInfo` — spell information lookup
+- GUID-based targeting — cast on specific units without switching target
+
+---
+
+## HealComm Integration
+
+QuickHeal includes QHealComm, a HealComm-compatible library that broadcasts incoming heal information to other healers. When pfUI is loaded, QHealComm delegates to pfUI's libpredict for seamless interop. When pfUI is absent, QHealComm runs a standalone implementation that sends and receives the same HealComm messages.
+
+This means:
+- Other healers using pfUI, HealComm, or QuickHeal can see your incoming heals.
+- QuickHeal subtracts other healers' incoming heals when selecting targets, reducing overheal.
+- HoT durations (Renew, Rejuvenation, Regrowth) and resurrections are tracked.
 
 ---
 
 ## Troubleshooting
 
 **Heals not stopping when they should:**
-- Check that `StopcastCheckWindow` is not too high
-- Verify `MaxOverhealPercent` is set appropriately
-- Ensure `StopcastEnabled` is checked in config
+- Check that `StopcastCheckWindow` is not too high.
+- Verify `MaxOverhealPercent` is set appropriately.
+- Ensure stopcasting is enabled in config.
 
 **Heals stopping too often:**
-- Increase `MaxOverhealPercent` to allow more overheal
-- **Decrease** `StopcastCheckWindow` to check later in the cast (e.g., from 1.5 to 0.5)
-- Check if target is frequently moving out of LOS
+- Increase `MaxOverhealPercent` to allow more overheal.
+- Decrease `StopcastCheckWindow` to check later in the cast.
 
 **AddOn not working:**
-- Make sure folder is named `QuickHeal` (not `QuickHeal-main`)
-- Check that all required libraries are present in the `libs` folder
-- Try `/reload` to refresh the UI
-- Run `/qh dll` to check for DLL enhancement status
+- Make sure folder is named `QuickHeal` (not `QuickHeal-main`).
+- Check that all required libraries are present in the `libs` folder.
+- Try `/reload` to refresh the UI.
+- Run `/qh dll` to check DLL status.
 
 **Unit frames not responding to click healing:**
-- Ensure QuickClick is enabled in configuration
-- Check that your unit frame addon is supported (Blizzard, Discord, Perl, X-Perl, EasyRaid, CT Raid Assist)
-- Verify Ctrl key is being held while clicking
-
-**Aggro detection not working:**
-- Check that enemies are actually targeting the unit (not just attacking nearby)
-- Enable debug mode with `/qh debug on` to see aggro detection details
+- Ensure QuickClick is enabled in configuration.
+- Check that your unit frame addon is supported.
+- Verify Ctrl key is being held while clicking.
 
 ---
 

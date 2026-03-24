@@ -75,6 +75,9 @@ local DQHV = { -- Default values
     PreHOTAggroPreference = "HIGHEST_MAX_HEALTH",  -- Preference for pre-HOT aggro target selection: HIGHEST_MAX_HEALTH or LOWEST_MAX_HEALTH
 }
 
+-- Runtime state for Book of Prayer (not saved)
+QH_BookLastSpell = nil  -- "gh" or "fh", tracks last heal type for alternation
+
 local has_pepo_nam = pcall(GetCVar, "NP_QueueCastTimeSpells")
 
 --[ DLL Detection ]--
@@ -3467,7 +3470,7 @@ local function ExecuteHeal(Target, SpellID)
         SpellNameAndRank .. " on " .. UnitFullName(Target) .. " (" .. Target .. ")" .. ", ID: " .. SpellID);
 
     -- Announce pending heal to HealComm (consumed by SPELLCAST_START)
-    HealComm:SetPendingHeal(UnitName(Target) or UnitFullName(Target), HealingSpellSize)
+    HealComm:SetPendingHeal(UnitName(Target) or UnitFullName(Target), HealingSpellSize, SpellName, Target, SpellRank)
 
     -- Check range and line of sight before casting (UnitXP)
     if has_unitxp then

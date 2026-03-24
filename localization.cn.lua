@@ -14,6 +14,7 @@ QUICKHEAL_SPELL_HEAL               = "治疗术"
 QUICKHEAL_SPELL_GREATER_HEAL       = "强效治疗术"
 QUICKHEAL_SPELL_FLASH_HEAL         = "快速治疗"
 QUICKHEAL_SPELL_RENEW              = "恢复"
+QUICKHEAL_SPELL_PRAYER_OF_HEALING  = "治疗祷言"
 
 -- Paladin
 QUICKHEAL_SPELL_HOLY_LIGHT         = "圣光术"

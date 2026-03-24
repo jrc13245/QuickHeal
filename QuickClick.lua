@@ -53,6 +53,13 @@ function QuickClick_DUF_Element_OnClick(button)
     if not QuickClick(button, this.unit or this:GetParent().unit) then QuickClick_OldOnClick.DUF_Element(button) end
 end
 
+-- pfUI
+function QuickClick_pfUI_OnClick()
+    local unit = (this.label or "") .. (this.id or "")
+    if unit == "" then unit = this.unit end
+    if not QuickClick(arg1, unit) then QuickClick_OldOnClick.pfUI_OnClick() end
+end
+
 --[[ Loading and Unloading ]]--
 
 function QuickClick_Load()
@@ -82,6 +89,12 @@ function QuickClick_Load()
             QuickClick_OldOnClick.DUF_Element,DUF_Element_OnClick = DUF_Element_OnClick,QuickClick_DUF_Element_OnClick;
         end
     end
+
+    -- Hook pfUI Unit Frames
+    if pfUI and pfUI.uf and type(pfUI.uf.OnClick) == "function" then
+        QuickClick_OldOnClick.pfUI_OnClick = pfUI.uf.OnClick;
+        pfUI.uf.OnClick = QuickClick_pfUI_OnClick;
+    end
 end
 
 function QuickClick_Unload()
@@ -110,6 +123,11 @@ function QuickClick_Unload()
             DUF_UnitFrame_OnClick = QuickClick_OldOnClick.DUF_UnitFrame;
             DUF_Element_OnClick = QuickClick_OldOnClick.DUF_Element;
         end
+    end
+
+    -- Unhook pfUI Unit Frames
+    if pfUI and pfUI.uf and type(QuickClick_OldOnClick.pfUI_OnClick) == "function" then
+        pfUI.uf.OnClick = QuickClick_OldOnClick.pfUI_OnClick;
     end
 
     QuickClick_OldOnClick = {};
