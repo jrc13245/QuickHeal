@@ -499,7 +499,7 @@ function QuickHeal_Priest_FindPoHTarget()
 
     for i = 1, numRaid do
         local unit = "raid" .. i
-        if UnitIsHealable(unit, true) then
+        if UnitExists(unit) and UnitIsFriend("player", unit) and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) then
             local _, _, subgroup = GetRaidRosterInfo(i)
             if subgroup then
                 local deficit = 0
