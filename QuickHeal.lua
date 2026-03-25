@@ -2677,14 +2677,28 @@ function CastCheckSpellHOT()
     local _, class = UnitClass('player');
     class = string.lower(class);
 
-    -- Use cast-time spells to avoid Nampower/SuperWoW auto-casting
-    -- instant HoTs (Rejuvenation/Renew/Holy Shock) on self during range checks
+    -- When standing still, use cast-time spells to avoid Nampower/SuperWoW
+    -- auto-casting instant HoTs on self. When moving, fall back to instant
+    -- spells since cast-time spells can't enter targeting mode while moving.
+    local moving = has_nampower and PlayerIsMoving and PlayerIsMoving() == 1
     if class == "druid" then
-        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_TOUCH)[1].SpellID, BOOKTYPE_SPELL);
+        if moving then
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_REJUVENATION)[1].SpellID, BOOKTYPE_SPELL);
+        else
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HEALING_TOUCH)[1].SpellID, BOOKTYPE_SPELL);
+        end
     elseif class == "paladin" then
-        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_LIGHT)[1].SpellID, BOOKTYPE_SPELL);
+        if moving then
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_SHOCK)[1].SpellID, BOOKTYPE_SPELL);
+        else
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_HOLY_LIGHT)[1].SpellID, BOOKTYPE_SPELL);
+        end
     elseif class == "priest" then
-        _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_LESSER_HEAL)[1].SpellID, BOOKTYPE_SPELL);
+        if moving then
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_RENEW)[1].SpellID, BOOKTYPE_SPELL);
+        else
+            _CastSpell(QuickHeal_GetSpellInfo(QUICKHEAL_SPELL_LESSER_HEAL)[1].SpellID, BOOKTYPE_SPELL);
+        end
     end
     --QuickHeal_debug("********** BREAKPOINT: CastCheckSpellHOT() done **********");
 end
