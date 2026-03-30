@@ -2797,6 +2797,7 @@ local function FindWhoToHeal(Restrict, extParam)
     -- Cast the checkspell
     CastCheckSpell();
     if not SpellIsTargeting() then
+        SpellStopCasting(); -- flush any spell Nampower queued instead of targeting mode
         -- Reacquire target if it was cleared
         if TargetWasCleared then
             TargetLastTarget();
@@ -3098,6 +3099,7 @@ local function FindWhoToHOT(Restrict, extParam, noHpCheck)
     -- Cast the checkspell
     CastCheckSpellHOT();
     if not SpellIsTargeting() then
+        SpellStopCasting(); -- flush any spell Nampower queued instead of targeting mode
         -- Reacquire target if it was cleared
         if TargetWasCleared then
             TargetLastTarget();
@@ -3922,6 +3924,24 @@ function QuickHeal(Target, SpellID, extParam, forceMaxHPS)
         return;
     end
 
+    -- Block if on GCD or mid-cast to prevent CastCheckSpell() from
+    -- queuing a range-check spell through Nampower
+    if has_nampower and GetCastInfo then
+        local ok, castInfo = pcall(GetCastInfo)
+        if ok and castInfo then
+            if castInfo.castRemainingMs and castInfo.castRemainingMs > 0 then
+                QuickHeal_debug("QuickHeal blocked: cast in progress ("
+                    .. castInfo.castRemainingMs .. "ms remaining)")
+                return
+            end
+            if castInfo.gcdRemainingMs and castInfo.gcdRemainingMs > 0 then
+                QuickHeal_debug("QuickHeal blocked: on GCD ("
+                    .. castInfo.gcdRemainingMs .. "ms remaining)")
+                return
+            end
+        end
+    end
+
     QuickHealBusy = true;
     local AutoSelfCast = GetCVar("autoSelfCast");
     SetCVar("autoSelfCast", 0);
@@ -4222,6 +4242,24 @@ local function QuickHOT_Inner(Target, SpellID, extParam, forceMaxRank, noHpCheck
 end
 
 function QuickHOT(Target, SpellID, extParam, forceMaxRank, noHpCheck)
+    -- Block if on GCD or mid-cast to prevent CastCheckSpellHOT() from
+    -- queuing a range-check spell through Nampower
+    if has_nampower and GetCastInfo then
+        local ok, castInfo = pcall(GetCastInfo)
+        if ok and castInfo then
+            if castInfo.castRemainingMs and castInfo.castRemainingMs > 0 then
+                QuickHeal_debug("QuickHOT blocked: cast in progress ("
+                    .. castInfo.castRemainingMs .. "ms remaining)")
+                return
+            end
+            if castInfo.gcdRemainingMs and castInfo.gcdRemainingMs > 0 then
+                QuickHeal_debug("QuickHOT blocked: on GCD ("
+                    .. castInfo.gcdRemainingMs .. "ms remaining)")
+                return
+            end
+        end
+    end
+
     QuickHealBusy = true;
     local AutoSelfCast = GetCVar("autoSelfCast");
     SetCVar("autoSelfCast", 0);

@@ -539,30 +539,61 @@ function qhHStrike(HSminHP, HSminTargets)
 end
 
 function qhHShock(SHOCKminHP)
-    local target, healthPct = GetLowestHealthUnit()
-    if target and healthPct < SHOCKminHP then
-        -- Check if SuperWoW is available for GUID/unit targeting
-        if SUPERWOW_VERSION then
-            CastSpellByName("Holy Shock", target)
-        else
-            -- Traditional method: target, cast, retarget
-            local hadTarget = UnitExists("target")
-            local wasEnemy = hadTarget and UnitIsEnemy("player", "target")
+    -- Check if Holy Shock is on cooldown
+    if GetSpellIdForName then
+        local ok, dbcId = pcall(GetSpellIdForName, QUICKHEAL_SPELL_HOLY_SHOCK)
+        if ok and dbcId and QH_IsSpellOnCooldown(dbcId) then
+            return
+        end
+    end
 
-            if target == "player" then
-                CastSpellByName("Holy Shock", true) -- true = self cast
-            elseif UnitIsUnit(target, "target") then
-                CastSpellByName("Holy Shock")
-            else
-                -- Need to switch target
-                TargetUnit(target)
-                CastSpellByName("Holy Shock")
-                if hadTarget then
-                    TargetLastTarget()
-                else
-                    ClearTarget()
-                end
-            end
+    -- Look up Holy Shock ranks from spellbook
+    local SpellIDs = QuickHeal_GetSpellIDs(QUICKHEAL_SPELL_HOLY_SHOCK)
+    local maxRank = type(SpellIDs) == "table" and table.getn(SpellIDs) or 0
+    if maxRank < 1 then return end
+
+    -- Pick highest rank we can afford
+    local ManaLeft = QH_GetUnitMana('player')
+    local manaCosts = { [1] = 225, [2] = 275, [3] = 325, [4] = 385 }
+    local spellID = nil
+    for r = maxRank, 1, -1 do
+        if SpellIDs[r] and ManaLeft >= (manaCosts[r] or 0) then
+            spellID = SpellIDs[r]
+            break
+        end
+    end
+    if not spellID then return end
+
+    local target, healthPct = GetLowestHealthUnit()
+    if not target or healthPct >= SHOCKminHP then return end
+
+    -- Get full spell name with rank (e.g. "Holy Shock(Rank 3)")
+    local SpellName, SpellRank = GetSpellName(spellID, BOOKTYPE_SPELL)
+    if not SpellName then return end
+    local fullName = SpellName .. (SpellRank and SpellRank ~= "" and "(" .. SpellRank .. ")" or "")
+
+    -- Try SuperWoW GUID targeting first (no target switching needed)
+    if SUPERWOW_VERSION then
+        local _, guid = UnitExists(target)
+        if guid then
+            CastSpellByName(fullName, guid)
+            return
+        end
+    end
+
+    -- Traditional method: target, cast, retarget
+    local hadTarget = UnitExists("target")
+    if target == "player" then
+        CastSpellByName(fullName, true)
+    elseif UnitIsUnit(target, "target") then
+        CastSpellByName(fullName)
+    else
+        TargetUnit(target)
+        CastSpellByName(fullName)
+        if hadTarget then
+            TargetLastTarget()
+        else
+            ClearTarget()
         end
     end
 end
@@ -575,23 +606,28 @@ function qhBoP(BOPminHP)
         -- Don't HoP tank-capable classes (HoP drops threat)
         local _, class = UnitClass(target)
         if class == "PALADIN" or class == "DRUID" or class == "SHAMAN" or class == "WARRIOR" then return end
+        -- Try SuperWoW GUID targeting first
         if SUPERWOW_VERSION then
-            CastSpellByName("Hand of Protection", target)
-        else
-            local hadTarget = UnitExists("target")
+            local _, guid = UnitExists(target)
+            if guid then
+                CastSpellByName("Hand of Protection", guid)
+                return
+            end
+        end
 
-            if target == "player" then
-                CastSpellByName("Hand of Protection", true)
-            elseif UnitIsUnit(target, "target") then
-                CastSpellByName("Hand of Protection")
+        -- Traditional method: target, cast, retarget
+        local hadTarget = UnitExists("target")
+        if target == "player" then
+            CastSpellByName("Hand of Protection", true)
+        elseif UnitIsUnit(target, "target") then
+            CastSpellByName("Hand of Protection")
+        else
+            TargetUnit(target)
+            CastSpellByName("Hand of Protection")
+            if hadTarget then
+                TargetLastTarget()
             else
-                TargetUnit(target)
-                CastSpellByName("Hand of Protection")
-                if hadTarget then
-                    TargetLastTarget()
-                else
-                    ClearTarget()
-                end
+                ClearTarget()
             end
         end
     end
@@ -640,10 +676,19 @@ function GetLowestHealthUnit()
     local lowestUnit = nil
     local lowestHealthPct = 100
 
+    -- Always check self first (CheckInteractDistance doesn't work on yourself in raid)
+    if IsHealable("player") then
+        local healthPct = (QH_GetUnitHealth("player") / QH_GetUnitMaxHealth("player")) * 100
+        if healthPct < lowestHealthPct then
+            lowestUnit = "player"
+            lowestHealthPct = healthPct
+        end
+    end
+
     if GetNumRaidMembers() > 0 then
         for i = 1, GetNumRaidMembers() do
             local unit = "raid" .. i
-            if IsHealable(unit) and CheckInteractDistance(unit, 4) then
+            if not UnitIsUnit(unit, "player") and IsHealable(unit) and CheckInteractDistance(unit, 4) then
                 local healthPct = (QH_GetUnitHealth(unit) / QH_GetUnitMaxHealth(unit)) * 100
                 if healthPct < lowestHealthPct then
                     lowestUnit = unit
@@ -652,18 +697,15 @@ function GetLowestHealthUnit()
             end
         end
     else
-        local units = { "player" }
         if GetNumPartyMembers() > 0 then
             for i = 1, GetNumPartyMembers() do
-                table.insert(units, "party" .. i)
-            end
-        end
-        for _, unit in ipairs(units) do
-            if IsHealable(unit) and CheckInteractDistance(unit, 4) then
-                local healthPct = ((QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) / QH_GetUnitMaxHealth(unit)) * 100
-                if healthPct < lowestHealthPct then
-                    lowestUnit = unit
-                    lowestHealthPct = healthPct
+                local unit = "party" .. i
+                if IsHealable(unit) and CheckInteractDistance(unit, 4) then
+                    local healthPct = ((QH_GetUnitHealth(unit) + HealComm:getHeal(UnitName(unit))) / QH_GetUnitMaxHealth(unit)) * 100
+                    if healthPct < lowestHealthPct then
+                        lowestUnit = unit
+                        lowestHealthPct = healthPct
+                    end
                 end
             end
         end
